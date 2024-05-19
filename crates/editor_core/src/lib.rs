@@ -100,6 +100,11 @@ fn editor_event_listener(
                 save_state.set(SaveState::Export);
                 info!("Exporting scene to {:?}", path);
             }
+            EditorEvent::CreateBundle(path) => {
+                save_config.path = Some(path.clone());
+                save_state.set(SaveState::CreateBundle);
+                info!("Creating bundle to {:?}", path);
+            }
             EditorEvent::StartGame => {
                 start_game_state.set(EditorState::GamePrepare);
             }

@@ -32,6 +32,9 @@ impl MapEntities for ChildrenPrefab {
     }
 }
 
+#[derive(Component)]
+pub struct BundleEntity;
+
 struct SaveResourcesPrefabPlugin;
 
 impl Plugin for SaveResourcesPrefabPlugin {
@@ -69,6 +72,16 @@ impl Plugin for SavePrefabPlugin {
             )
                 .chain(),
         );
+        app.add_systems(
+            OnEnter(SaveState::CreateBundle),
+            (
+                prepare_children,
+                apply_deferred,
+                create_bundle,
+                delete_prepared_children,
+            )
+                .chain(),
+        );
     }
 }
 
@@ -85,6 +98,7 @@ pub struct SaveConfig {
 pub enum SaveState {
     Save,
     Export,
+    CreateBundle,
     #[default]
     Idle,
 }
@@ -263,6 +277,76 @@ pub fn serialize_scene_export(world: &mut World) {
         error!(err);
     }
 
+    world
+        .resource_mut::<NextState<SaveState>>()
+        .set(SaveState::Idle);
+}
+
+fn create_bundle(
+    mut world: &mut World,
+) {
+    let config = world.resource::<SaveConfig>().clone();
+
+    let mut bundle_query = world.query_filtered::<Entity, With<BundleEntity>>();
+    let entities: Vec<_> = bundle_query.iter(world).collect();
+    let registry = world.resource::<EditorRegistry>().clone();
+    let allow_types: Vec<TypeId> = registry
+        .registry
+        .read()
+        .iter()
+        .map(|a| a.type_id())
+        .collect();
+    let scene = DynamicSceneBuilder::from_world(&mut world)
+        .allow_all()
+        .with_filter(SceneFilter::Allowlist(HashSet::from_iter(
+            allow_types.iter().cloned(),
+        )))
+        .extract_entities(entities.iter().copied())
+        .build();
+
+    let res = scene.serialize_ron(world.resource::<AppTypeRegistry>());
+
+    if let Ok(str) = res {
+        let path = config.path;
+        if let Some(path) = path {
+            match path {
+                EditorPrefabPath::File(path) => {
+                    IoTaskPool::get()
+                        .spawn(async move {
+                            fs::OpenOptions::new()
+                                .create(true)
+                                .truncate(true)
+                                .append(false)
+                                .write(true)
+                                .open(&path)
+                                .and_then(|mut file| file.write(str.as_bytes()))
+                                .inspect_err(|e| error!("Error while writing scene to file: {e}"))
+                                .expect("Error while writing scene to file");
+                            info!("Exported prefab to file {}", path);
+                        })
+                        .detach();
+                }
+                EditorPrefabPath::MemoryCache => {
+                    let handle = world.resource_mut::<Assets<DynamicScene>>().add(scene);
+                    world.resource_mut::<PrefabMemoryCache>().scene = Some(handle);
+                }
+            }
+        }
+    } else if let Err(e) = res {
+        // Any ideas on how to test this error case?
+        #[cfg_attr(tarpaulin, ignore)]
+            let err = format!("failed to serialize prefab: {:?}", e);
+        #[cfg(feature = "editor")]
+        world.send_event(space_shared::toast::ToastMessage::new(
+            &err,
+            space_shared::toast::ToastKind::Error,
+        ));
+        error!(err);
+    }
+
+    for entity in entities {
+        world.entity_mut(entity).remove::<BundleEntity>();
+    }
     world
         .resource_mut::<NextState<SaveState>>()
         .set(SaveState::Idle);

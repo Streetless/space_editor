@@ -8,9 +8,11 @@ use bevy_egui::{
 };
 use space_editor_core::prelude::*;
 use space_prefab::{component::SceneAutoChild, editor_registry::EditorRegistry};
+use space_prefab::save::BundleEntity;
 use space_undo::{AddedEntity, NewChange, RemovedEntity, UndoSet};
 
 use space_shared::*;
+use crate::ext::egui_file;
 
 use super::{editor_tab::EditorTabName, EditorUiAppExt, EditorUiRef};
 
@@ -26,9 +28,15 @@ pub struct CloneEvent {
 #[derive(Default)]
 pub struct SpaceHierarchyPlugin {}
 
+#[derive(Resource, Default)]
+pub struct MenuHierarchyState {
+    create_bundle_dialog: Option<egui_file::FileDialog>,
+}
+
 impl Plugin for SpaceHierarchyPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HierarchyTabState>();
+        app.init_resource::<MenuHierarchyState>();
         app.editor_tab(EditorTabName::Hierarchy, "Hierarchy".into(), show_hierarchy);
 
         // app.add_systems(Update, show_hierarchy.before(crate::editor::ui_camera_block).in_set(EditorSet::Editor));
@@ -68,7 +76,11 @@ pub fn show_hierarchy(
     mut changes: EventWriter<NewChange>,
     mut state: ResMut<HierarchyTabState>,
     auto_children: Query<(), With<SceneAutoChild>>,
+    mut menu_state: ResMut<MenuHierarchyState>,
+    mut ctxs: EguiContexts,
+    mut editor_events: EventWriter<EditorEvent>,
 ) {
+    let ctx = ctxs.ctx_mut();
     let mut all: Vec<_> = if state.show_editor_entities {
         all_entities.iter().collect()
     } else {
@@ -111,6 +123,7 @@ pub fn show_hierarchy(
                         &mut clone_events,
                         &mut changes,
                         &auto_children,
+                        &mut menu_state,
                     );
                 } else {
                     draw_entity::<With<PrefabMarker>>(
@@ -122,11 +135,39 @@ pub fn show_hierarchy(
                         &mut clone_events,
                         &mut changes,
                         &auto_children,
+                        &mut menu_state,
                     );
                 }
             }
         }
     });
+    if let Some(create_bundle_dialog) = &mut menu_state.create_bundle_dialog {
+        if create_bundle_dialog.show(ctx).selected() {
+            if let Some(file) = create_bundle_dialog.path() {
+                let path = file.to_str().unwrap().to_string();
+                //remove assets/ from path
+                if path.ends_with(".bundle.ron") {
+                    let path = path.replace(".bundle.ron", "");
+                    println!("{path}");
+                    editor_events.send(EditorEvent::CreateBundle(EditorPrefabPath::File(
+                        format!("{}.bundle.ron", path),
+                    )));
+                }
+            }
+        } else {
+            let mut need_move_to_default_dir = false;
+            if let Some(path) = create_bundle_dialog.directory().to_str() {
+                if !path.contains("assets") {
+                    need_move_to_default_dir = true;
+                }
+            } else {
+                need_move_to_default_dir = true;
+            }
+            if need_move_to_default_dir {
+                create_bundle_dialog.set_path("assets/");
+            }
+        }
+    };
 }
 
 type DrawIter<'a> = (
@@ -145,6 +186,7 @@ fn draw_entity<F: QueryFilter>(
     clone_events: &mut EventWriter<CloneEvent>,
     changes: &mut EventWriter<NewChange>,
     auto_children: &Query<(), With<SceneAutoChild>>,
+    menu_state: &mut MenuHierarchyState,
 ) {
     let Ok((_, name, children, parent)) = query.get(entity) else {
         return;
@@ -188,6 +230,7 @@ fn draw_entity<F: QueryFilter>(
                         changes,
                         clone_events,
                         selected,
+                        menu_state,
                         parent,
                     );
                 });
@@ -221,6 +264,7 @@ fn draw_entity<F: QueryFilter>(
                     clone_events,
                     changes,
                     auto_children,
+                    menu_state,
                 );
             }
         });
@@ -250,6 +294,7 @@ fn draw_entity<F: QueryFilter>(
                     changes,
                     clone_events,
                     selected,
+                    menu_state,
                     parent,
                 );
             });
@@ -281,6 +326,7 @@ fn hierarchy_entity_context(
     changes: &mut EventWriter<'_, NewChange>,
     clone_events: &mut EventWriter<'_, CloneEvent>,
     selected: &mut Query<'_, '_, Entity, With<Selected>>,
+    menu_state: &mut MenuHierarchyState,
     parent: Option<&Parent>,
 ) {
     if ui.button("Add child").clicked() {
@@ -302,6 +348,21 @@ fn hierarchy_entity_context(
         clone_events.send(CloneEvent { id: entity });
         ui.close_menu();
     }
+    // Create bundle
+    if ui.button("Create bundle").clicked() {
+        let entities: Vec<Entity> = selected.iter().collect();
+        for entity in entities {
+            commands.entity(entity).insert(BundleEntity);
+        }
+        ui.close_menu();
+        let mut create_bundle_dialog =
+            egui_file::FileDialog::save_file(Some("./assets/bundles".into()))
+                .default_filename("NewBundle.bundle.ron")
+                .title("Create bundle");
+        create_bundle_dialog.open();
+        menu_state.create_bundle_dialog = Some(create_bundle_dialog);
+    }
+    //End create bundle
     if !selected.is_empty() && !selected.contains(entity) && ui.button("Attach to").clicked() {
         for e in selected.iter() {
             commands.entity(entity).add_child(e);

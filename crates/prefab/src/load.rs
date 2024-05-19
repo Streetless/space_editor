@@ -24,10 +24,11 @@ pub struct PrefabBundle {
 
 impl PrefabBundle {
     /// Create new prefab bundle from path to prefab file
-    pub fn new(path: &str) -> Self {
+    pub fn new(path: &str, name: &str) -> Self {
         Self {
             loader: PrefabLoader {
                 path: path.to_string(),
+                name: name.to_string(),
             },
             ..default()
         }
@@ -64,6 +65,7 @@ impl Plugin for LoadPlugin {
 #[reflect(Component)]
 pub struct PrefabLoader {
     pub path: String,
+    pub name: String,
 }
 
 /// System responsible for loading prefabs
@@ -83,6 +85,7 @@ fn load_prefab(
     assets: ResMut<AssetServer>,
 ) {
     for (e, l, children, tr, vis) in query.iter() {
+        commands.entity(e).insert(Name::new(l.name.clone()));
         if tr.is_none() {
             commands
                 .entity(e)
