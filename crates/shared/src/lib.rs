@@ -66,6 +66,7 @@ pub enum EditorPrefabPath {
 pub enum EditorEvent {
     Load(EditorPrefabPath),
     Save(EditorPrefabPath),
+    Export(EditorPrefabPath),
     LoadGltfAsPrefab(String),
     StartGame,
 }

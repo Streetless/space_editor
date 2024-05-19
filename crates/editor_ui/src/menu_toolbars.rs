@@ -143,6 +143,7 @@ pub struct MenuToolbarState {
     pub save_dialog: Option<egui_file::FileDialog>,
     pub load_dialog: Option<egui_file::FileDialog>,
     pub subscene_dialog: Option<egui_file::FileDialog>,
+    pub export_dialog: Option<egui_file::FileDialog>,
     show_toasts: bool,
     pub path: String,
 }
@@ -522,6 +523,50 @@ pub fn top_menu(
                         }
                     }
                 }
+
+                //Export Scene
+                let export_button = egui::Button::new(to_richtext("💾", &sizing.icon))
+                    .stroke(stroke_default_color());
+                if ui
+                    .add(export_button)
+                    .on_hover_text("Export current scene")
+                    .clicked()
+                {
+                    let mut export_dialog =
+                        egui_file::FileDialog::save_file(Some("./assets/scenes".into()))
+                            .default_filename("Scene0.scn.json")
+                            .title("Export Scene");
+                    export_dialog.open();
+                    menu_state.export_dialog = Some(export_dialog);
+                }
+                if let Some(export_dialog) = &mut menu_state.export_dialog {
+                    if export_dialog.show(ctx).selected() {
+                        if let Some(file) = export_dialog.path() {
+                            let path = file.to_str().unwrap().to_string();
+                            //remove assets/ from path
+                            if path.ends_with(".scn.json") {
+                                let path = path.replace(".scn.json", "");
+                                println!("{path}");
+                                editor_events.send(EditorEvent::Export(EditorPrefabPath::File(
+                                    format!("{}.scn.json", path),
+                                )));
+                            }
+                        }
+                    } else {
+                        let mut need_move_to_default_dir = false;
+                        if let Some(path) = export_dialog.directory().to_str() {
+                            if !path.contains("assets") {
+                                need_move_to_default_dir = true;
+                            }
+                        } else {
+                            need_move_to_default_dir = true;
+                        }
+                        if need_move_to_default_dir {
+                            export_dialog.set_path("assets/");
+                        }
+                    }
+                };
+                //End of export
 
                 let width = ui.available_width();
                 let distance = width / 2. - 40.;
