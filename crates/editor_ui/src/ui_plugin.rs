@@ -6,6 +6,7 @@ use bevy_egui::egui::{
 };
 use camera_plugin::draw_camera_gizmo;
 use meshless_visualizer::draw_light_gizmo;
+use egui::emath::Rect;
 
 use self::{
     colors::*,
@@ -209,18 +210,26 @@ fn test_change_tab(
     mut resize: EventReader<ResizeTabEvent>,
 ) {
     for event in focus_tab.read() {
-        println!("Focus tab: {:?}", event.tab);
+        println!("Focus tab: {:?} with rect {:?}", event.tab, event.rect);
     }
     for event in open.read() {
         match &event.open_type {
-            OpenTabType::SplitNode(other_node) => {
-                println!("Open tab: {:?} in split node {:?}", event.tab, other_node);
+            OpenTabType::SplitNode {
+                other_node,
+                new_node_rect: rect,
+            } => {
+                println!("Open tab: {:?} in split node {:?} with rect {:?}", event.tab, other_node, rect);
             }
-            OpenTabType::SameNode(source_node) => {
-                println!("Open tab: {:?} in same node {:?}", event.tab, source_node);
+            OpenTabType::SameNode {
+                source_node,
+                new_node_rect: rect,
+            } => {
+                println!("Open tab: {:?} in same node {:?} with rect {:?}", event.tab, source_node, rect);
             }
-            OpenTabType::AddNode => {
-                println!("Open tab: {:?}", event.tab);
+            OpenTabType::AddNode {
+                new_node_rect: rect,
+            } => {
+                println!("Open tab: {:?} in new node with rect {:?}", event.tab, rect);
             }
         }
     }
@@ -280,18 +289,27 @@ pub struct EditorUi {
     pub tree: egui_dock::DockState<EditorTabName>,
     pub focused_tab: Option<EditorTabName>,
     pub open_tabs: Vec<EditorTabName>,
-    pub tabs_size: Vec<(EditorTabName, egui::Rect)>
+    pub tabs_size: Vec<(EditorTabName, Rect)>
 }
 
 #[derive(Event)]
 pub struct FocusTabEvent {
     pub tab: EditorTabName,
+    pub rect: Rect,
 }
 
 pub enum OpenTabType {
-    SplitNode(EditorTabName),
-    SameNode(EditorTabName),
-    AddNode,
+    SplitNode {
+        other_node: EditorTabName,
+        new_node_rect: Rect,
+    },
+    SameNode {
+        source_node: EditorTabName,
+        new_node_rect: Rect,
+    },
+    AddNode {
+        new_node_rect: Rect,
+    },
 }
 
 #[derive(Event)]
@@ -308,7 +326,7 @@ pub struct CloseTabEvent {
 #[derive(Event)]
 pub struct ResizeTabEvent {
     pub tab: EditorTabName,
-    pub rect: egui::Rect,
+    pub rect: Rect,
 }
 
 impl Default for EditorUi {
@@ -341,6 +359,7 @@ impl EditorUi {
                 self.focused_tab = Some(focused.1.clone());
                 world.send_event(FocusTabEvent {
                     tab: focused.1.clone(),
+                    rect: focused.0,
                 });
             }
         }
@@ -361,7 +380,7 @@ impl EditorUi {
             });
         }
 
-        let mut resized_tabs : Vec<(EditorTabName, egui::Rect)> = vec![];
+        let mut resized_tabs : Vec<(EditorTabName, Rect)> = vec![];
         let open_tabs_rect = {
             let mut open_tabs_rect = vec![];
             let tree_tabs = self.tree.iter_all_nodes().map(|(_, node)| node.clone()).collect::<Vec<_>>();
@@ -445,52 +464,69 @@ impl EditorUi {
                 } => {
                     match windows_setting.new_tab {
                         NewTabBehaviour::Pop => {
-                            self.tree.add_window(vec![name.clone()]);
-                            open_events.push(OpenTabEvent {
-                                tab: name.clone(),
-                                open_type: OpenTabType::AddNode,
-                            });
+                            let new_surface_index = self.tree.add_window(vec![name.clone()]);
+                            let mut new_node: Option<(Rect, &mut EditorTabName)> = None;
+                            if let Some(new_surface) = self.tree.get_surface_mut(new_surface_index) {
+                                if let Some(tree) = new_surface.node_tree_mut() {
+                                    tree.set_focused_node(node);
+                                    new_node = tree.find_active_focused();
+                                }
+                            }
+                            if let Some((rect, _)) = new_node {
+                                open_events.push(OpenTabEvent {
+                                    tab: name,
+                                    open_type: OpenTabType::AddNode { new_node_rect: rect },
+                                });
+                            }
                         }
                         NewTabBehaviour::SameNode => {
                             let tab_name = name.clone();
-                            let mut source_node_name: Option<EditorTabName> = None;
+                            let mut source_node: Option<(Rect, EditorTabName)> = None;
                             if let Some(tree) = self
                                 .tree
                                 .get_surface_mut(surface)
                                 .and_then(|surface| surface.node_tree_mut())
                             {
                                 tree.set_focused_node(node);
-                                if let Some(tab_name) = tree.find_active_focused() {
-                                    source_node_name = Some(tab_name.1.clone());
-                                }
+                                let mut tree_clone = tree.clone();
+                                source_node = tree_clone.find_active_focused().map(|(rect, name)| {
+                                    (rect, name.clone())
+                                });
                                 tree.push_to_focused_leaf(name);
                             }
-                            if let Some(source_node_name) = source_node_name {
+                            if let Some((rect, source_node_name)) = source_node {
                                 open_events.push(OpenTabEvent {
                                     tab: tab_name,
-                                    open_type: OpenTabType::SameNode(source_node_name),
+                                    open_type: OpenTabType::SameNode {
+                                        source_node: source_node_name.clone(),
+                                        new_node_rect: rect,
+                                    },
                                 });
                             }
                         }
                         NewTabBehaviour::SplitNode => {
                             let tab_name = name.clone();
-                            let mut other_node_name: Option<EditorTabName> = None;
+                            let mut infos: Option<(Rect, EditorTabName)> = None;
                             if let Some(surface) = self.tree.get_surface_mut(surface) {
-                                surface
+                                let indexes = surface
                                     .node_tree_mut()
                                     .unwrap()
                                     .split_right(node, 0.5, vec![name]);
+                                surface.node_tree_mut().unwrap().set_focused_node(indexes[1]);
+                                let rect = surface.node_tree_mut().unwrap().find_active_focused().unwrap().0;
                                 let other_node = surface.iter_all_tabs().find(|(node_index, _)| {
                                     node.0 == node_index.0
-                                });
-                                if let Some(other_node) = other_node {
-                                    other_node_name = Some(other_node.1.clone());
-                                }
+                                }).unwrap();
+                                let other_node_name = other_node.1.clone();
+                                infos = Some((rect, other_node_name));
                             }
-                            if let Some(other_node_name) = other_node_name {
+                            if let Some((rect, other_node_name)) = infos {
                                 open_events.push(OpenTabEvent {
                                     tab: tab_name,
-                                    open_type: OpenTabType::SplitNode(other_node_name),
+                                    open_type: OpenTabType::SplitNode {
+                                        other_node: other_node_name,
+                                        new_node_rect: rect,
+                                    },
                                 });
                             }
                         }
