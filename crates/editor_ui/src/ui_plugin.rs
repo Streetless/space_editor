@@ -231,6 +231,10 @@ fn test_change_tab(
     for event in resize.read() {
         println!("Resize tab: {:?} to {:?}", event.tab, event.rect);
     }
+    focus_tab.clear();
+    open.clear();
+    close.clear();
+    resize.clear();
 }
 
 /// This system use to show all egui editor ui on primary window
@@ -371,9 +375,11 @@ impl EditorUi {
             let tree_tabs = self.tree.iter_all_nodes().map(|(_, node)| node.clone()).collect::<Vec<_>>();
             for tab in tree_tabs {
                 if let Some(rect) = tab.rect() {
-                    let tab_name = tab.tabs().and_then(|tabs| tabs.first().cloned());
-                    if let Some(tab_name) = tab_name {
-                        open_tabs_rect.push((tab_name, rect));
+                    let test = tab.tabs().and_then(|tabs| Some(tabs));
+                    if let Some(tabs) = test {
+                        for tab in tabs {
+                            open_tabs_rect.push((tab.clone(), rect));
+                        }
                     }
                 }
             }
@@ -385,8 +391,10 @@ impl EditorUi {
         for tab in open_tabs_rect.clone() {
             if !self.tabs_size.contains(&tab) {
                 resized_tabs.push(tab);
-                self.tabs_size = open_tabs_rect.clone();
             }
+        }
+        if resized_tabs.len() != 0 {
+            self.tabs_size = open_tabs_rect.clone();
         }
         for (tab, rect) in resized_tabs{
             world.send_event(ResizeTabEvent {
