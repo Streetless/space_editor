@@ -105,6 +105,8 @@ impl Plugin for EditorUiCore {
     fn build(&self, app: &mut App) {
         app.init_state::<ShowEditorUi>();
 
+        app.add_event::<FocusTabEvent>();
+
         app.configure_sets(
             Update,
             UiSystemSet
@@ -192,6 +194,16 @@ impl Plugin for EditorUiCore {
         app.add_event::<selection::SelectEvent>();
 
         app.init_resource::<BundleReg>();
+
+        app.add_systems(Update, test_change_tab);
+    }
+}
+
+fn test_change_tab(
+    mut events: EventReader<FocusTabEvent>,
+) {
+    for event in events.read() {
+        println!("Focus tab: {:?}", event.tab);
     }
 }
 
@@ -241,6 +253,18 @@ pub fn show_editor_ui(world: &mut World) {
 pub struct EditorUi {
     pub registry: HashMap<EditorTabName, EditorUiReg>,
     pub tree: egui_dock::DockState<EditorTabName>,
+    pub focused_tab: Option<EditorTabName>,
+}
+
+#[derive(Event)]
+pub struct FocusTabEvent {
+    pub tab: EditorTabName,
+}
+
+impl FocusTabEvent {
+    fn new(tab: EditorTabName) -> Self {
+        Self { tab }
+    }
 }
 
 impl Default for EditorUi {
@@ -248,6 +272,7 @@ impl Default for EditorUi {
         Self {
             registry: HashMap::default(),
             tree: egui_dock::DockState::new(vec![]),
+            focused_tab: None,
         }
     }
 }
@@ -265,6 +290,12 @@ pub enum EditorUiReg {
 
 impl EditorUi {
     pub fn ui(&mut self, world: &mut World, ctx: &mut egui::Context) {
+        if let Some(focused) = self.tree.find_active_focused() {
+            if self.focused_tab != Some(focused.1.clone()) {
+                self.focused_tab = Some(focused.1.clone());
+                world.send_event(FocusTabEvent::new(focused.1.clone()));
+            }
+        }
         //collect tab names to vec to detect visible
         let mut visible = vec![];
         for (_surface_index, tab) in self.tree.iter_all_nodes() {

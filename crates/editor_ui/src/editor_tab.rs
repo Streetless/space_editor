@@ -3,10 +3,7 @@ use bevy::{prelude::*, utils::HashMap};
 use bevy_egui::egui::{self, WidgetText};
 use convert_case::{Case, Casing};
 
-use crate::{
-    colors::ERROR_COLOR,
-    sizing::{to_label, Sizing},
-};
+use crate::{colors::ERROR_COLOR, sizing::{to_label, Sizing}};
 
 use super::{EditorUiRef, EditorUiReg};
 
