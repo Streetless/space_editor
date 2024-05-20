@@ -106,6 +106,9 @@ impl Plugin for EditorUiCore {
         app.init_state::<ShowEditorUi>();
 
         app.add_event::<FocusTabEvent>();
+        app.add_event::<OpenTabEvent>();
+        app.add_event::<ResizeTabEvent>();
+        app.add_event::<CloseTabEvent>();
 
         app.configure_sets(
             Update,
@@ -200,10 +203,32 @@ impl Plugin for EditorUiCore {
 }
 
 fn test_change_tab(
-    mut events: EventReader<FocusTabEvent>,
+    mut focus_tab: EventReader<FocusTabEvent>,
+    mut open: EventReader<OpenTabEvent>,
+    mut close: EventReader<CloseTabEvent>,
+    mut resize: EventReader<ResizeTabEvent>,
 ) {
-    for event in events.read() {
+    for event in focus_tab.read() {
         println!("Focus tab: {:?}", event.tab);
+    }
+    for event in open.read() {
+        match &event.open_type {
+            OpenTabType::SplitNode(other_node) => {
+                println!("Open tab: {:?} in split node {:?}", event.tab, other_node);
+            }
+            OpenTabType::SameNode(source_node) => {
+                println!("Open tab: {:?} in same node {:?}", event.tab, source_node);
+            }
+            OpenTabType::AddNode => {
+                println!("Open tab: {:?}", event.tab);
+            }
+        }
+    }
+    for event in close.read() {
+        println!("Close tab: {:?}", event.tab);
+    }
+    for event in resize.read() {
+        println!("Resize tab: {:?} to {:?}", event.tab, event.rect);
     }
 }
 
@@ -254,6 +279,8 @@ pub struct EditorUi {
     pub registry: HashMap<EditorTabName, EditorUiReg>,
     pub tree: egui_dock::DockState<EditorTabName>,
     pub focused_tab: Option<EditorTabName>,
+    pub open_tabs: Vec<EditorTabName>,
+    pub tabs_size: Vec<(EditorTabName, egui::Rect)>
 }
 
 #[derive(Event)]
@@ -261,10 +288,27 @@ pub struct FocusTabEvent {
     pub tab: EditorTabName,
 }
 
-impl FocusTabEvent {
-    fn new(tab: EditorTabName) -> Self {
-        Self { tab }
-    }
+pub enum OpenTabType {
+    SplitNode(EditorTabName),
+    SameNode(EditorTabName),
+    AddNode,
+}
+
+#[derive(Event)]
+pub struct OpenTabEvent {
+    pub tab: EditorTabName,
+    pub open_type: OpenTabType,
+}
+
+#[derive(Event)]
+pub struct CloseTabEvent {
+    pub tab: EditorTabName,
+}
+
+#[derive(Event)]
+pub struct ResizeTabEvent {
+    pub tab: EditorTabName,
+    pub rect: egui::Rect,
 }
 
 impl Default for EditorUi {
@@ -273,6 +317,8 @@ impl Default for EditorUi {
             registry: HashMap::default(),
             tree: egui_dock::DockState::new(vec![]),
             focused_tab: None,
+            open_tabs: vec![],
+            tabs_size: vec![],
         }
     }
 }
@@ -293,9 +339,58 @@ impl EditorUi {
         if let Some(focused) = self.tree.find_active_focused() {
             if self.focused_tab != Some(focused.1.clone()) {
                 self.focused_tab = Some(focused.1.clone());
-                world.send_event(FocusTabEvent::new(focused.1.clone()));
+                world.send_event(FocusTabEvent {
+                    tab: focused.1.clone(),
+                });
             }
         }
+
+        let tree_tabs_name = self.tree.iter_all_tabs().map(|(_, tab)| tab.clone()).collect::<Vec<_>>();
+        let mut closed_tabs : Vec<EditorTabName> = vec![];
+        if self.open_tabs.len() != tree_tabs_name.len(){
+            for tab_name in self.open_tabs.iter(){
+                if !tree_tabs_name.contains(tab_name){
+                    closed_tabs.push(tab_name.clone());
+                }
+            }
+           self.open_tabs = tree_tabs_name;
+        }
+        for tab in closed_tabs{
+            world.send_event(CloseTabEvent {
+                tab: tab.clone(),
+            });
+        }
+
+        let mut resized_tabs : Vec<(EditorTabName, egui::Rect)> = vec![];
+        let open_tabs_rect = {
+            let mut open_tabs_rect = vec![];
+            let tree_tabs = self.tree.iter_all_nodes().map(|(_, node)| node.clone()).collect::<Vec<_>>();
+            for tab in tree_tabs {
+                if let Some(rect) = tab.rect() {
+                    let tab_name = tab.tabs().and_then(|tabs| tabs.first().cloned());
+                    if let Some(tab_name) = tab_name {
+                        open_tabs_rect.push((tab_name, rect));
+                    }
+                }
+            }
+            open_tabs_rect
+        };
+        if self.tabs_size.len() != open_tabs_rect.len() {
+            self.tabs_size = open_tabs_rect.clone();
+        }
+        for tab in open_tabs_rect.clone() {
+            if !self.tabs_size.contains(&tab) {
+                resized_tabs.push(tab);
+                self.tabs_size = open_tabs_rect.clone();
+            }
+        }
+        for (tab, rect) in resized_tabs{
+            world.send_event(ResizeTabEvent {
+                tab: tab.clone(),
+                rect,
+            });
+        }
+
         //collect tab names to vec to detect visible
         let mut visible = vec![];
         for (_surface_index, tab) in self.tree.iter_all_nodes() {
@@ -340,32 +435,64 @@ impl EditorUi {
             .show(ctx, &mut tab_viewer);
 
         let windows_setting = unsafe { cell.world_mut().resource_mut::<NewWindowSettings>() };
+        let mut open_events : Vec<OpenTabEvent> = vec![];
         for command in tab_viewer.tab_commands {
             match command {
                 EditorTabCommand::Add {
                     name,
                     surface,
                     node,
-                } => match windows_setting.new_tab {
-                    NewTabBehaviour::Pop => {
-                        self.tree.add_window(vec![name]);
-                    }
-                    NewTabBehaviour::SameNode => {
-                        if let Some(tree) = self
-                            .tree
-                            .get_surface_mut(surface)
-                            .and_then(|surface| surface.node_tree_mut())
-                        {
-                            tree.set_focused_node(node);
-                            tree.push_to_focused_leaf(name);
+                } => {
+                    match windows_setting.new_tab {
+                        NewTabBehaviour::Pop => {
+                            self.tree.add_window(vec![name.clone()]);
+                            open_events.push(OpenTabEvent {
+                                tab: name.clone(),
+                                open_type: OpenTabType::AddNode,
+                            });
                         }
-                    }
-                    NewTabBehaviour::SplitNode => {
-                        if let Some(surface) = self.tree.get_surface_mut(surface) {
-                            surface
-                                .node_tree_mut()
-                                .unwrap()
-                                .split_right(node, 0.5, vec![name]);
+                        NewTabBehaviour::SameNode => {
+                            let tab_name = name.clone();
+                            let mut source_node_name: Option<EditorTabName> = None;
+                            if let Some(tree) = self
+                                .tree
+                                .get_surface_mut(surface)
+                                .and_then(|surface| surface.node_tree_mut())
+                            {
+                                tree.set_focused_node(node);
+                                if let Some(tab_name) = tree.find_active_focused() {
+                                    source_node_name = Some(tab_name.1.clone());
+                                }
+                                tree.push_to_focused_leaf(name);
+                            }
+                            if let Some(source_node_name) = source_node_name {
+                                open_events.push(OpenTabEvent {
+                                    tab: tab_name,
+                                    open_type: OpenTabType::SameNode(source_node_name),
+                                });
+                            }
+                        }
+                        NewTabBehaviour::SplitNode => {
+                            let tab_name = name.clone();
+                            let mut other_node_name: Option<EditorTabName> = None;
+                            if let Some(surface) = self.tree.get_surface_mut(surface) {
+                                surface
+                                    .node_tree_mut()
+                                    .unwrap()
+                                    .split_right(node, 0.5, vec![name]);
+                                let other_node = surface.iter_all_tabs().find(|(node_index, _)| {
+                                    node.0 == node_index.0
+                                });
+                                if let Some(other_node) = other_node {
+                                    other_node_name = Some(other_node.1.clone());
+                                }
+                            }
+                            if let Some(other_node_name) = other_node_name {
+                                open_events.push(OpenTabEvent {
+                                    tab: tab_name,
+                                    open_type: OpenTabType::SplitNode(other_node_name),
+                                });
+                            }
                         }
                     }
                 },
@@ -374,6 +501,10 @@ impl EditorUi {
 
         unsafe {
             command_queue.apply(cell.world_mut());
+        }
+
+        for event in open_events {
+            world.send_event(event);
         }
     }
 }
