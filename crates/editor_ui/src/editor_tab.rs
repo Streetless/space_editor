@@ -140,6 +140,10 @@ impl<'a, 'w, 's> egui_dock::TabViewer for EditorTabViewer<'a, 'w, 's> {
             ui.label("All tabs are showing");
         }
     }
+
+    fn allowed_in_windows(&self, _tab: &mut Self::Tab) -> bool {
+        false
+    }
 }
 
 pub struct ScheduleEditorTab {

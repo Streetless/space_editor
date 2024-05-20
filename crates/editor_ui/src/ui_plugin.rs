@@ -214,22 +214,14 @@ fn test_change_tab(
     }
     for event in open.read() {
         match &event.open_type {
-            OpenTabType::SplitNode {
-                other_node,
-                new_node_rect: rect,
-            } => {
-                println!("Open tab: {:?} in split node {:?} with rect {:?}", event.tab, other_node, rect);
+            OpenTabType::SplitNode(other_node) => {
+                println!("Open tab: {:?} in split node {:?} with rect {:?}", event.tab, other_node, event.rect);
             }
-            OpenTabType::SameNode {
-                source_node,
-                new_node_rect: rect,
-            } => {
-                println!("Open tab: {:?} in same node {:?} with rect {:?}", event.tab, source_node, rect);
+            OpenTabType::SameNode(source_node) => {
+                println!("Open tab: {:?} in same node {:?} with rect {:?}", event.tab, source_node, event.rect);
             }
-            OpenTabType::AddNode {
-                new_node_rect: rect,
-            } => {
-                println!("Open tab: {:?} in new node with rect {:?}", event.tab, rect);
+            OpenTabType::AddNode => {
+                println!("Open tab: {:?} in new node with rect {:?}", event.tab, event.rect);
             }
         }
     }
@@ -299,22 +291,15 @@ pub struct FocusTabEvent {
 }
 
 pub enum OpenTabType {
-    SplitNode {
-        other_node: EditorTabName,
-        new_node_rect: Rect,
-    },
-    SameNode {
-        source_node: EditorTabName,
-        new_node_rect: Rect,
-    },
-    AddNode {
-        new_node_rect: Rect,
-    },
+    SplitNode(EditorTabName),
+    SameNode(EditorTabName),
+    AddNode
 }
 
 #[derive(Event)]
 pub struct OpenTabEvent {
     pub tab: EditorTabName,
+    pub rect: Rect,
     pub open_type: OpenTabType,
 }
 
@@ -475,7 +460,8 @@ impl EditorUi {
                             if let Some((rect, _)) = new_node {
                                 open_events.push(OpenTabEvent {
                                     tab: name,
-                                    open_type: OpenTabType::AddNode { new_node_rect: rect },
+                                    rect,
+                                    open_type: OpenTabType::AddNode,
                                 });
                             }
                         }
@@ -497,10 +483,8 @@ impl EditorUi {
                             if let Some((rect, source_node_name)) = source_node {
                                 open_events.push(OpenTabEvent {
                                     tab: tab_name,
-                                    open_type: OpenTabType::SameNode {
-                                        source_node: source_node_name.clone(),
-                                        new_node_rect: rect,
-                                    },
+                                    rect,
+                                    open_type: OpenTabType::SameNode(source_node_name),
                                 });
                             }
                         }
@@ -523,10 +507,8 @@ impl EditorUi {
                             if let Some((rect, other_node_name)) = infos {
                                 open_events.push(OpenTabEvent {
                                     tab: tab_name,
-                                    open_type: OpenTabType::SplitNode {
-                                        other_node: other_node_name,
-                                        new_node_rect: rect,
-                                    },
+                                    rect,
+                                    open_type: OpenTabType::SplitNode(other_node_name),
                                 });
                             }
                         }
