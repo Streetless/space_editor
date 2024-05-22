@@ -16,6 +16,15 @@ pub mod asset_fs;
 pub(crate) mod gizmos;
 pub mod toast;
 
+#[derive(Resource, Debug, Reflect, Default)]
+#[reflect(Resource)]
+pub struct ProjectInfo {
+    pub title: String,
+    pub description: String,
+    pub author: String,
+    pub latest_update: String,
+}
+
 /// Component Marker to display entity in Editor
 #[derive(Component, Default, Clone, Reflect)]
 #[reflect(Component)]

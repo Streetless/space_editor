@@ -38,6 +38,7 @@ convert_case.workspace = true
 anyhow.workspace = true
 bevy_common_assets.workspace = true
 egui_extras.workspace = true
+chrono = "0.4.38"
 
 [patch.crates-io]
 egui-gizmo = { git = "https://github.com/naomijub/egui-gizmo.git" }

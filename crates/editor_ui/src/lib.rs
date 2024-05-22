@@ -91,11 +91,7 @@ use prelude::{
 };
 use space_editor_core::toast::ToastUiPlugin;
 use space_prefab::prelude::*;
-use space_shared::{
-    ext::bevy_inspector_egui::{quick::WorldInspectorPlugin, DefaultInspectorConfigPlugin},
-    toast::ToastMessage,
-    EditorCameraMarker, EditorSet, EditorState, PrefabMarker, PrefabMemoryCache,
-};
+use space_shared::{ext::bevy_inspector_egui::{quick::WorldInspectorPlugin, DefaultInspectorConfigPlugin}, toast::ToastMessage, EditorCameraMarker, EditorSet, EditorState, PrefabMarker, PrefabMemoryCache, ProjectInfo};
 use space_undo::{SyncUndoMarkersPlugin, UndoPlugin, UndoSet};
 use ui_registration::BundleReg;
 
@@ -103,6 +99,8 @@ use camera_plugin::*;
 use ui_plugin::*;
 
 use self::{mouse_check::MouseCheck, tools::gizmo::GizmoToolPlugin};
+
+use chrono::{Utc};
 
 pub const LAST_RENDER_LAYER: u8 = RenderLayers::TOTAL_LAYERS as u8 - 1;
 
@@ -138,6 +136,13 @@ pub struct EditorPlugin;
 impl Plugin for EditorPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(EditorPluginGroup);
+        app.register_type::<ProjectInfo>();
+        app.insert_resource(ProjectInfo {
+            title: "Space Editor".to_string(),
+            description: "Space Editor".to_string(),
+            author: "EnVRonment".to_string(),
+            latest_update: Utc::now().to_string(),
+        });
     }
 }
 

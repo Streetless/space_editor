@@ -9,6 +9,8 @@ use std::{any::TypeId, fs, io::Write};
 
 use crate::prelude::{EditorRegistry, EditorRegistryExt, SceneAutoChild};
 
+use space_shared::ProjectInfo;
+
 #[derive(Reflect, Default, Component, Clone)]
 #[reflect(Component, MapEntities)]
 /// Component that holds children entity/prefab information
@@ -138,19 +140,26 @@ pub fn serialize_scene(world: &mut World) {
     }
 
     let registry = world.resource::<EditorRegistry>().clone();
+
+    let project_info = world.get_resource::<ProjectInfo>().unwrap();
+    println!("Project Info: {:?}", project_info);
     let allow_types: Vec<TypeId> = registry
         .registry
         .read()
         .iter()
         .map(|a| a.type_id())
         .collect();
+
     let mut builder = DynamicSceneBuilder::from_world(world);
     builder = builder
+        .allow_resource::<ProjectInfo>()
+        .extract_resources()
         .allow_all()
         .with_filter(SceneFilter::Allowlist(HashSet::from_iter(
             allow_types.iter().cloned(),
         )))
         .extract_entities(entities.iter().copied());
+
     let scene = builder.build();
 
     let res = scene.serialize_ron(world.resource::<AppTypeRegistry>());
@@ -224,6 +233,8 @@ pub fn serialize_scene_export(world: &mut World) {
         .collect();
     let mut builder = DynamicSceneBuilder::from_world(world);
     builder = builder
+        .allow_resource::<ProjectInfo>()
+        .extract_resources()
         .allow_all()
         .with_filter(SceneFilter::Allowlist(HashSet::from_iter(
             allow_types.iter().cloned(),
