@@ -72,6 +72,7 @@ image = {version = "0.24.8", feature = ["png"] }
 pretty-type-name = "1"
 ron = "0.8"
 serde = "1"
+rfd = "0.14.1"
 
 # Community Modules
 space_bevy_xpbd_plugin = { version = "0.5.0", path = "modules/bevy_xpbd_plugin"}

@@ -3,6 +3,7 @@ use bevy::prelude::*;
 pub mod ext {
     pub use bevy_inspector_egui;
     pub use egui_file;
+    pub use rfd;
 }
 
 pub mod prelude {
