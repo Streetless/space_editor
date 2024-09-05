@@ -13,11 +13,12 @@ use bevy::{
     reflect::ReflectFromPtr,
     utils::HashMap,
 };
-
+use bevy::ecs::world::unsafe_world_cell::UnsafeEntityCell;
 use bevy_egui::{egui::TextEdit, *};
-
+use bevy_egui::egui::Id;
 use space_editor_core::prelude::*;
 use space_prefab::{component::EntityLink, editor_registry::EditorRegistry};
+use space_prefab::editor_registry::EditorRegistryExt;
 use space_shared::ext::bevy_inspector_egui::{
     self, inspector_egui_impls::InspectorEguiImpl, reflect_inspector::InspectorUi,
 };
@@ -27,7 +28,6 @@ use crate::{
     icons::add_component_icon,
     sizing::{to_label, Sizing},
 };
-
 use self::{
     components_order::{ComponentsOrder, ComponentsPriority},
     events_dispatcher::EventDispatcherTab,
@@ -45,6 +45,12 @@ use super::{
 #[derive(Component)]
 pub struct SkipInspector;
 
+#[derive(Component, Reflect, Default)]
+pub struct Locked;
+
+#[derive(Component, Reflect, Default)]
+pub struct Disabled;
+
 /// Plugin to activate components inspector
 pub struct SpaceInspectorPlugin;
 
@@ -53,6 +59,8 @@ impl Plugin for SpaceInspectorPlugin {
         app.init_resource::<InspectState>();
         app.init_resource::<FilterComponentState>();
         app.init_resource::<ComponentsOrder>();
+        app.register_type::<Disabled>();
+        app.register_type::<Locked>();
         app.editor_component_priority::<Name>(0);
         app.editor_component_priority::<Transform>(1);
 
@@ -77,7 +85,7 @@ pub struct InspectorTab {
 }
 
 impl EditorTab for InspectorTab {
-    fn ui(&mut self, ui: &mut egui::Ui, _: &mut Commands, world: &mut World) {
+    fn ui(&mut self, ui: &mut egui::Ui, bevy_commands: &mut Commands, world: &mut World) {
         let sizing = world.resource::<Sizing>().clone();
         let selected_entity = world
             .query_filtered::<Entity, With<Selected>>()
@@ -164,6 +172,37 @@ impl EditorTab for InspectorTab {
                     name = format!("{:?}", e.id());
                 }
                 ui.heading(&name);
+                ui.horizontal(|ui| unsafe {
+                    let mut is_enabled = e.get::<Disabled>().is_none();
+                    let mut is_locked = e.get::<Locked>().is_some();
+                    if ui.checkbox(&mut is_enabled, "Enabled").clicked() {
+                        //Inverse because checkbox and changing is_enabled its opposite
+                        if !is_enabled {
+                            info!("Disabling entity {:?} and its children", e.id());
+                            bevy_commands.entity(e.id()).insert(Disabled);
+                            bevy_commands.entity(e.id()).insert(Visibility::Hidden);
+                            add_component_to_tree::<Disabled>(e, bevy_commands);
+                            change_tree_visibility(e, bevy_commands, Visibility::Inherited);
+                        } else {
+                            info!("Enabling entity {:?} and its children", e.id());
+                            bevy_commands.entity(e.id()).remove::<Disabled>();
+                            bevy_commands.entity(e.id()).insert(Visibility::Visible);
+                            remove_component_to_tree::<Disabled>(e, bevy_commands);
+                            change_tree_visibility(e, bevy_commands, Visibility::Inherited);
+                        }
+                    }
+                    if ui.checkbox(&mut is_locked, "Locked").clicked() {
+                        if is_locked {
+                            info!("Locking entity {:?} and its children", e.id());
+                            bevy_commands.entity(e.id()).insert(Locked);
+                            add_component_to_tree::<Locked>(e, bevy_commands);
+                        } else {
+                            info!("Unlocking entity {:?} and its children", e.id());
+                            bevy_commands.entity(e.id()).remove::<Locked>();
+                            remove_component_to_tree::<Locked>(e, bevy_commands);
+                        }
+                    }
+                });
                 let mut state = unsafe { cell.get_resource_mut::<FilterComponentState>().unwrap() };
                 ui.horizontal(|ui| {
                     let button_size = ui
@@ -185,6 +224,7 @@ impl EditorTab for InspectorTab {
                 });
                 let lower_filter = state.component_add_filter.to_lowercase();
                 let e_id = e.id().index();
+                let is_locked = unsafe { e.get::<Locked>().is_some() };
 
                 ui.label("Components:");
                 egui::Grid::new(format!("{e_id}")).show(ui, |ui| {
@@ -219,6 +259,7 @@ impl EditorTab for InspectorTab {
                                                 &mut env,
                                                 value,
                                                 &mut set_changed,
+                                                is_locked,
                                             );
 
                                             ui.push_id(
@@ -252,6 +293,7 @@ impl EditorTab for InspectorTab {
                                             &mut env,
                                             value,
                                             &mut set_changed,
+                                            is_locked,
                                         );
                                         ui.end_row();
                                     }
@@ -362,6 +404,40 @@ impl EditorTab for InspectorTab {
     }
 }
 
+fn add_component_to_tree<T: Component + Default>(parent: UnsafeEntityCell, commands: &mut Commands) {
+    if let Some(children) = unsafe { parent.get::<Children>() } {
+        for child in children.iter() {
+            commands.entity(*child).insert(T::default());
+            let child = unsafe { parent.world().get_entity(*child).unwrap() };
+            add_component_to_tree::<T>(child, commands);
+        }
+    }
+}
+
+fn remove_component_to_tree<T: Component>(parent: UnsafeEntityCell, commands: &mut Commands) {
+    if let Some(children) = unsafe { parent.get::<Children>() } {
+        for child in children.iter() {
+            commands.entity(*child).remove::<T>();
+            let child = unsafe { parent.world().get_entity(*child).unwrap() };
+            remove_component_to_tree::<T>(child, commands);
+        }
+    }
+}
+
+fn change_tree_visibility(
+    parent: UnsafeEntityCell,
+    commands: &mut Commands,
+    visibility: Visibility,
+) {
+    if let Some(children) = unsafe { parent.get::<Children>() } {
+        for child in children.iter() {
+            commands.entity(*child).insert(visibility);
+            let child = unsafe { parent.world().get_entity(*child).unwrap() };
+            change_tree_visibility(child, commands, visibility);
+        }
+    }
+}
+
 impl InspectorTab {
     fn show_component(
         &mut self,
@@ -371,17 +447,23 @@ impl InspectorTab {
         env: &mut InspectorUi<'_, '_>,
         value: &mut dyn Reflect,
         set_changed: &mut impl FnMut(),
+        is_locked : bool,
     ) {
         ui.push_id(format!("{:?}-{}", &e.id(), &name), |ui| {
             let default = name.to_lowercase() == *"transform";
             let header = egui::CollapsingHeader::new(name)
                 .default_open(*self.open_components.get(name).unwrap_or(&default))
                 .show(ui, |ui| {
-                    ui.push_id(format!("content-{:?}-{}", &e.id(), &name), |ui| {
+                    ui.set_enabled(!is_locked);
+                    let id = ui.push_id(format!("content-{:?}-{}", &e.id(), &name), |ui| {
                         if env.ui_for_reflect_with_options(value, ui, ui.id(), &()) {
                             (set_changed)();
                         }
-                    });
+                    }).response.id;
+                    if is_locked {
+                        ui.interact(ui.min_rect(), id, egui::Sense::click_and_drag());
+                    }
+                    ui.set_enabled(true);
                 });
             if header.header_response.clicked() {
                 let open_name = self.open_components.entry(name.clone()).or_default();

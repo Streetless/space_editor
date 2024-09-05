@@ -12,6 +12,8 @@ use crate::{
     sizing::Sizing,
     tool::ToolExt,
 };
+use crate::inspector::Locked;
+
 pub struct GizmoToolPlugin;
 
 impl Plugin for GizmoToolPlugin {
@@ -166,7 +168,7 @@ impl EditorTool for GizmoTool {
         };
 
         let selected = world
-            .query_filtered::<Entity, With<Selected>>()
+            .query_filtered::<Entity, (With<Selected>, Without<Locked>)>()
             .iter(world)
             .collect::<Vec<_>>();
         let mut disable_pan_orbit = false;

@@ -26,7 +26,7 @@ pub enum MeshPrimitive3dPrefab {
 #[derive(Component, Reflect, Clone)]
 #[reflect(Default, Component)]
 pub enum MeshPrimitive2dPrefab {
-    Rectagle(QuadPrefab),
+    Rectangle(QuadPrefab),
     Circle(CirclePrefab),
     Ellipse(EllipsePrefab),
     Triangle(TrianglePrefab),
@@ -47,7 +47,7 @@ impl Default for MeshPrimitive3dPrefab {
 
 impl Default for MeshPrimitive2dPrefab {
     fn default() -> Self {
-        Self::Rectagle(QuadPrefab { size: Vec2::ONE })
+        Self::Rectangle(QuadPrefab { size: Vec2::ONE })
     }
 }
 
@@ -74,7 +74,7 @@ impl MeshPrimitive2dPrefab {
     /// Convert [`MeshPrimitive2dPrefab`] to bevy [`Mesh`]
     pub fn to_mesh(&self) -> Mesh {
         match self {
-            Self::Rectagle(q) => q.to_mesh(),
+            Self::Rectangle(q) => q.to_mesh(),
             Self::Circle(c) => c.to_mesh(),
             Self::Ellipse(e) => e.to_mesh(),
             Self::Triangle(t) => t.to_mesh(),

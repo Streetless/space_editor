@@ -80,6 +80,7 @@ use bevy::{
     utils::HashMap,
     window::PrimaryWindow,
 };
+use bevy::asset::AssetLoader;
 use bevy_egui::{egui, EguiContext};
 
 use game_view::{has_window_changed, GameViewPlugin};

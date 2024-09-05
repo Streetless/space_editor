@@ -141,8 +141,6 @@ pub fn serialize_scene(world: &mut World) {
 
     let registry = world.resource::<EditorRegistry>().clone();
 
-    let project_info = world.get_resource::<ProjectInfo>().unwrap();
-    println!("Project Info: {:?}", project_info);
     let allow_types: Vec<TypeId> = registry
         .registry
         .read()
