@@ -23,6 +23,7 @@ pub enum EditorTabName {
     RuntimeAssets,
     Settings,
     ToolBox,
+    FileManager,
     Other(String),
 }
 
@@ -37,7 +38,7 @@ pub enum EditorTabCommand {
     },
 }
 
-pub struct EditorTabViewer<'a, 'w, 's> {
+pub struct  EditorTabViewer<'a, 'w, 's> {
     pub world: &'a mut World,
     pub commands: &'a mut Commands<'w, 's>,
     pub registry: &'a mut HashMap<EditorTabName, EditorUiReg>,

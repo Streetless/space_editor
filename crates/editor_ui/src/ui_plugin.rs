@@ -7,7 +7,7 @@ use bevy_egui::egui::{
 use camera_plugin::draw_camera_gizmo;
 use meshless_visualizer::draw_light_gizmo;
 use egui::emath::Rect;
-
+use crate::file_manager::FileManagerPlugin;
 use self::{
     colors::*,
     sizing::{to_label, Sizing},
@@ -50,6 +50,7 @@ impl FlatPluginList for EditorUiPlugin {
             .add(CameraViewTabPlugin)
             .add(SpaceHierarchyPlugin::default())
             .add(SpaceInspectorPlugin)
+            .add(FileManagerPlugin)
             .add(GizmoToolPlugin)
             .add(ChangeChainViewPlugin)
             .add(settings::SettingsWindowPlugin);
@@ -77,7 +78,7 @@ impl Plugin for DefaultEditorLayoutPlugin {
         let mut editor = app.world.resource_mut::<EditorUi>();
         editor.tree = egui_dock::DockState::new(vec![EditorTabName::GameView]);
 
-        let [_game, hierarchy] = editor.tree.main_surface_mut().split_left(
+        let [game, hierarchy] = editor.tree.main_surface_mut().split_left(
             egui_dock::NodeIndex::root(),
             0.2,
             vec![EditorTabName::Hierarchy],
@@ -86,6 +87,11 @@ impl Plugin for DefaultEditorLayoutPlugin {
             hierarchy,
             0.3,
             vec![EditorTabName::Inspector],
+        );
+        let [_, _file_manager] = editor.tree.main_surface_mut().split_below(
+            game,
+            0.7,
+            vec![EditorTabName::FileManager],
         );
     }
 }

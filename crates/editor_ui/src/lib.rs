@@ -27,6 +27,9 @@ pub mod hierarchy;
 /// This module contains Inspector tab logic
 pub mod inspector;
 
+/// This module contains FileManager tab logic
+pub mod file_manager;
+
 /// This module contains methods to visualize entities without a mesh attached
 pub mod meshless_visualizer;
 
@@ -90,6 +93,7 @@ use prelude::{
     GameModeSettings, GameViewTab, MeshlessVisualizerPlugin, NewTabBehaviour, NewWindowSettings,
     ScheduleEditorTab, ScheduleEditorTabStorage, SpaceHierarchyPlugin, SpaceInspectorPlugin,
 };
+use file_manager::FileManagerPlugin;
 use space_editor_core::toast::ToastUiPlugin;
 use space_prefab::prelude::*;
 use space_shared::{ext::bevy_inspector_egui::{quick::WorldInspectorPlugin, DefaultInspectorConfigPlugin}, toast::ToastMessage, EditorCameraMarker, EditorSet, EditorState, PrefabMarker, PrefabMemoryCache, ProjectInfo};
