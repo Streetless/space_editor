@@ -3863,7 +3863,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pico-args"
+name = "pico-ARGS"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5be167a7af36ee22fe3115051bc51f6e6c7054c9348e28deb4f49bd6f705a315"
@@ -4200,7 +4200,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cadccb3d99a9efb8e5e00c16fbb732cbe400db2ec7fc004697ee7d97d86cf1f4"
 dependencies = [
  "log",
- "pico-args",
+ "pico-ARGS",
  "rgb",
  "svgtypes",
  "tiny-skia",
@@ -5151,7 +5151,7 @@ checksum = "38b0a51b72ab80ca511d126b77feeeb4fb1e972764653e61feac30adc161a756"
 dependencies = [
  "base64",
  "log",
- "pico-args",
+ "pico-ARGS",
  "usvg-parser",
  "usvg-tree",
  "xmlwriter",
