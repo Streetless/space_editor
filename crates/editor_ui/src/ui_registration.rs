@@ -161,11 +161,11 @@ pub fn register_mesh_editor_bundles(app: &mut App) {
     );
     app.editor_bundle(
         "Mesh",
-        "3D Rectagle",
+        "3D Rectangle",
         (
             PrefabMarker,
             MeshPrimitive3dPrefab::Quad(QuadPrefab::default()),
-            Name::new("Rectagle".to_string()),
+            Name::new("Rectangle".to_string()),
             Transform::default(),
             VisibilityBundle::default(),
         ),
@@ -250,10 +250,10 @@ pub fn register_mesh_editor_bundles(app: &mut App) {
 
     app.editor_bundle(
         "Mesh",
-        "2D Rectagle",
+        "2D Rectangle",
         (
             PrefabMarker,
-            MeshPrimitive2dPrefab::Rectagle(QuadPrefab::default()),
+            MeshPrimitive2dPrefab::Rectangle(QuadPrefab::default()),
             Name::new("2D Quad".to_string()),
             Transform::default(),
             VisibilityBundle::default(),
