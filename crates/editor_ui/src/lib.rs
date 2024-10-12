@@ -310,14 +310,14 @@ fn set_start_state(mut state: ResMut<NextState<EditorState>>) {
 
 fn clear_and_load_on_start(
     mut load_server: ResMut<EditorLoader>,
-    save_confg: Res<SaveConfig>,
+    save_config: Res<SaveConfig>,
     assets: Res<AssetServer>,
     cache: Res<PrefabMemoryCache>,
 ) {
-    if save_confg.path.is_none() {
+    if save_config.path.is_none() {
         return;
     }
-    match save_confg.path.as_ref() {
+    match save_config.path.as_ref() {
         Some(space_shared::EditorPrefabPath::File(path)) => {
             info!("Loading prefab from file {}", path);
             load_server.scene = Some(assets.load(format!("{}.scn.ron", path)));

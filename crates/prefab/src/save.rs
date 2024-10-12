@@ -59,6 +59,16 @@ impl Plugin for SavePrefabPlugin {
             )
                 .chain(),
         );
+        app.add_systems(
+            OnEnter(SaveState::Export),
+            (
+                prepare_children,
+                apply_deferred,
+                serialize_scene_export,
+                delete_prepared_children,
+            )
+                .chain(),
+        );
     }
 }
 
@@ -74,6 +84,7 @@ pub struct SaveConfig {
 #[derive(States, Debug, Clone, Copy, Default, Eq, PartialEq, Hash)]
 pub enum SaveState {
     Save,
+    Export,
     #[default]
     Idle,
 }
@@ -191,6 +202,118 @@ pub fn serialize_scene(world: &mut World) {
     } else if let Err(e) = res {
         // Any ideas on how to test this error case?
         #[cfg(not(tarpaulin_include))]
+        let err = format!("failed to serialize prefab: {:?}", e);
+        #[cfg(feature = "editor")]
+        world.send_event(space_shared::toast::ToastMessage::new(
+            &err,
+            space_shared::toast::ToastKind::Error,
+        ));
+        error!(err);
+    }
+
+    if let Some(mut state) = world.get_resource_mut::<NextState<SaveState>>() {
+        state.set(SaveState::Idle)
+    }
+}
+
+pub fn serialize_scene_export(world: &mut World) {
+    let Some(config) = world.get_resource::<SaveConfig>().cloned() else {
+        #[cfg(feature = "editor")]
+        world.send_event(space_shared::toast::ToastMessage::new(
+            "Save config resource not initialized",
+            space_shared::toast::ToastKind::Error,
+        ));
+        error!("Save config resource not initialized");
+        return;
+    };
+
+    let mut prefab_query =
+        world.query_filtered::<Entity, (With<PrefabMarker>, Without<SceneAutoChild>)>();
+    let entities = prefab_query.iter(world).collect::<Vec<_>>();
+
+    if entities.is_empty() {
+        #[cfg(feature = "editor")]
+        world.send_event(space_shared::toast::ToastMessage::new(
+            "Exporting empty scene",
+            space_shared::toast::ToastKind::Warning,
+        ));
+        warn!("Exporting empty scene");
+    }
+
+    let Some(registry) = world.get_resource::<EditorRegistry>().cloned() else {
+        #[cfg(feature = "editor")]
+        world.send_event(space_shared::toast::ToastMessage::new(
+            "Editor Registry not initialized",
+            space_shared::toast::ToastKind::Error,
+        ));
+        error!("Editor Registry not initialized");
+        return;
+    };    let allow_types: Vec<TypeId> = registry
+        .registry
+        .read()
+        .iter()
+        .map(|a| a.type_id())
+        .collect();
+    let mut builder = DynamicSceneBuilder::from_world(world);
+    builder = builder
+        .allow_all()
+        .with_filter(SceneFilter::Allowlist(HashSet::from_iter(
+            allow_types.iter().cloned(),
+        )))
+        .extract_entities(entities.iter().copied());
+    let scene = builder.build();
+
+    let Some(app_registry) = world.get_resource::<AppTypeRegistry>() else {
+        #[cfg(feature = "editor")]
+        world.send_event(space_shared::toast::ToastMessage::new(
+            "App Registry not initialized",
+            space_shared::toast::ToastKind::Error,
+        ));
+        error!("App Registry not initialized");
+        return;
+    };
+
+    let res = scene.serialize(&app_registry.read());
+
+    if let Ok(str) = res {
+        let mut de = ron::de::Deserializer::from_str(&*str).expect("Error while deserializing");
+        let mut buffer = Vec::new();
+        let mut ser = serde_json::Serializer::pretty(&mut buffer);
+        serde_transcode::transcode(&mut de, &mut ser).expect("Error while transcode");
+        let str = String::from_utf8(buffer).expect("Error while converting to utf8");
+        // Write the scene JSON data to file
+        let path = config.path;
+        if let Some(path) = path {
+            match path {
+                EditorPrefabPath::File(path) => {
+                    IoTaskPool::get()
+                        .spawn(async move {
+                            fs::OpenOptions::new()
+                                .create(true)
+                                .truncate(true)
+                                .append(false)
+                                .write(true)
+                                .open(&path)
+                                .and_then(|mut file| file.write(str.as_bytes()))
+                                .inspect_err(|e| error!("Error while writing scene to file: {e}"))
+                                .expect("Error while writing scene to file");
+                            info!("Exported prefab to file {}", path);
+                        })
+                        .detach();
+                }
+                EditorPrefabPath::MemoryCache => {
+                    let handle = world
+                        .get_resource_mut::<Assets<DynamicScene>>()
+                        .map(|mut assets| assets.add(scene));
+                    if let Some(mut cache) = world.get_resource_mut::<PrefabMemoryCache>() {
+                        cache.scene = handle;
+                    }
+                }
+            }
+        }
+    } else if let Err(e) = res {
+        // Any ideas on how to test this error case?
+        #[cfg_attr(tarpaulin, ignore)]
         let err = format!("failed to serialize prefab: {:?}", e);
         #[cfg(feature = "editor")]
         world.send_event(space_shared::toast::ToastMessage::new(
