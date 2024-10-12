@@ -50,8 +50,12 @@ pub fn update_mouse_context(
     mut egui_ctxs: EguiContexts,
 ) {
     if let Some(window_id) = pointer_ctx.primary_window {
-        pointer_ctx.pointer_is_valid = !egui_ctxs
-            .ctx_for_entity_mut(window_id)
-            .wants_pointer_input();
+        match egui_ctxs.try_ctx_for_entity_mut(window_id) {
+            Some(ctx) => pointer_ctx.pointer_is_valid = !ctx.wants_pointer_input(),
+            None => pointer_ctx.pointer_is_valid = false,
+        };
+        // pointer_ctx.pointer_is_valid = !egui_ctxs
+        //     .ctx_for_entity_mut(window_id)
+        //     .wants_pointer_input();
     }
 }

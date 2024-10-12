@@ -81,9 +81,13 @@ fn in_game_menu(
     mut time: ResMut<Time<Virtual>>,
     sizing: Res<Sizing>,
 ) {
+    let ctx = match ctxs.try_ctx_mut() {
+        Some(ctx) => ctx,
+        None => return,
+    };
     egui::TopBottomPanel::top("top_gameplay_panel")
         .min_height(&sizing.icon.to_size() + 8.)
-        .show(ctxs.ctx_mut(), |ui| {
+        .show(ctx, |ui| {
             let frame_duration = time.delta();
             if !time.is_paused() {
                 *smoothed_dt = (*smoothed_dt).mul_add(0.98, time.delta_seconds() * 0.02);
@@ -163,7 +167,10 @@ pub fn bottom_menu(
     sizing: Res<Sizing>,
     q_pan_cam: Query<&PanOrbitCamera>,
 ) {
-    let ctx = ctxs.ctx_mut();
+    let ctx = match ctxs.try_ctx_mut() {
+        Some(ctx) => ctx,
+        None => return,
+    };
     egui::TopBottomPanel::bottom("bottom_menu")
         .min_height(&sizing.icon.to_size().max(sizing.text) + 4.)
         .show(ctx, |ui| {
@@ -297,7 +304,10 @@ pub fn top_menu(
     toasts: Res<ToastStorage>,
     sizing: Res<Sizing>,
 ) {
-    let ctx = ctxs.ctx_mut();
+    let ctx = match ctxs.try_ctx_mut() {
+        Some(ctx) => ctx,
+        None => return,
+    };
     egui::TopBottomPanel::top("top_menu_bar")
         .min_height(&sizing.icon.to_size() + 8.)
         .show(ctx, |ui| {
