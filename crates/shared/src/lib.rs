@@ -67,6 +67,7 @@ pub enum EditorEvent {
     Load(EditorPrefabPath),
     Save(EditorPrefabPath),
     Export(EditorPrefabPath),
+    CreateBundle(EditorPrefabPath),
     LoadGltfAsPrefab(String),
     StartGame,
 }

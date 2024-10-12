@@ -512,8 +512,9 @@ pub fn top_menu(
                             path.to_str().unwrap().ends_with(".scn.ron")
                                 || path.to_str().unwrap().ends_with(".gltf")
                                 || path.to_str().unwrap().ends_with(".glb")
+                                || path.to_str().unwrap().ends_with(".bundle.ron")
                         }))
-                        .title("Open Subscene (.scn.ron, .gltf, .glb)");
+                        .title("Open Subscene (.scn.ron, .bundle.ron, .gltf, .glb)");
                     filedialog.open();
 
                     menu_state.subscene_dialog = Some(filedialog);
@@ -529,8 +530,11 @@ pub fn top_menu(
                                 path = path.trim_start_matches('\\').to_string();
                                 path = path.trim_start_matches('/').to_string();
 
-                                if path.ends_with(".scn.ron") {
-                                    commands.spawn((PrefabBundle::new(&path), PrefabMarker));
+                                if path.ends_with(".scn.ron") || path.ends_with(".bundle.ron") {
+                                    let name = path.split('/').last().expect("No name");
+                                    let name = name.split('\\').last().expect("No name");
+                                    let name = name.replace(".scn.ron", "").replace(".bundle.ron", "");
+                                    commands.spawn((PrefabBundle::new(&path, &name), PrefabMarker));
                                 } else if path.ends_with(".gltf") || path.ends_with(".glb") {
                                     commands.spawn((
                                         SpatialBundle::default(),
