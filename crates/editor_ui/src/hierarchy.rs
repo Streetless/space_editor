@@ -340,14 +340,20 @@ fn hierarchy_entity_context(
         ui.close_menu();
     }
     if ui.button("Delete").clicked() {
-        commands.entity(entity).despawn_recursive();
-        changes.send(NewChange {
-            change: Arc::new(RemovedEntity { entity }),
-        });
+        let entities: Vec<Entity> = selected.iter().collect();
+        for e in entities {
+            commands.entity(e).despawn_recursive();
+            changes.send(NewChange {
+                change: Arc::new(RemovedEntity { entity: e }),
+            });
+        }
         ui.close_menu();
     }
     if ui.button("Clone").clicked() {
-        clone_events.send(CloneEvent { id: entity });
+        let entities: Vec<Entity> = selected.iter().collect();
+        for e in entities {
+            clone_events.send(CloneEvent { id: e });
+        }
         ui.close_menu();
     }
     // Create bundle
