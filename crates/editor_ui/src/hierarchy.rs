@@ -11,6 +11,10 @@ use space_prefab::{component::SceneAutoChild, editor_registry::EditorRegistry};
 use space_undo::{AddedEntity, NewChange, RemovedEntity, UndoSet};
 use space_prefab::save::BundleEntity;
 use crate::ext::egui_file;
+use bevy_egui::egui::{Id, Widget};
+use space_prefab::editor_registry::EditorRegistryExt;
+use crate::prelude::{BundleReg, Disabled, Locked};
+use crate::ui_registration::EditorBundleUntyped;
 
 use space_shared::*;
 
@@ -41,7 +45,7 @@ impl Plugin for SpaceHierarchyPlugin {
         app.editor_tab(EditorTabName::Hierarchy, show_hierarchy);
 
         // app.add_systems(Update, show_hierarchy.before(crate::editor::ui_camera_block).in_set(EditorSet::Editor));
-        app.add_systems(Update, clone_enitites.in_set(EditorSet::Editor));
+        app.add_systems(Update, clone_entities.in_set(EditorSet::Editor));
         app.add_systems(
             PostUpdate,
             detect_cloned_entities
@@ -72,6 +76,7 @@ pub fn show_hierarchy(
     query: Query<HierarchyQueryIter, With<PrefabMarker>>,
     all_entities: Query<HierarchyQueryIter>,
     mut selected: Query<Entity, With<Selected>>,
+    mut disabled: Query<Entity, With<Disabled>>,
     mut clone_events: EventWriter<CloneEvent>,
     mut ui: NonSendMut<EditorUiRef>,
     mut changes: EventWriter<NewChange>,
@@ -80,6 +85,8 @@ pub fn show_hierarchy(
     mut menu_state: ResMut<MenuHierarchyState>,
     mut ctxs: EguiContexts,
     mut editor_events: EventWriter<EditorEvent>,
+    ui_reg: Res<BundleReg>,
+    mut locked_entities: Query<Entity, With<Locked>>
 ) {
     let ctx = ctxs.ctx_mut();
     let mut all: Vec<_> = if state.show_editor_entities {
@@ -121,10 +128,13 @@ pub fn show_hierarchy(
                         &all_entities,
                         *entity,
                         &mut selected,
+                        &mut disabled,
                         &mut clone_events,
                         &mut changes,
                         &auto_children,
                         &mut menu_state,
+                        &ui_reg,
+                        &mut locked_entities
                     );
                 } else {
                     draw_entity::<With<PrefabMarker>>(
@@ -133,10 +143,13 @@ pub fn show_hierarchy(
                         &query,
                         *entity,
                         &mut selected,
+                        &mut disabled,
                         &mut clone_events,
                         &mut changes,
                         &auto_children,
                         &mut menu_state,
+                        &ui_reg,
+                        &mut locked_entities
                     );
                 }
             }
@@ -169,6 +182,17 @@ pub fn show_hierarchy(
             }
         }
     };
+    let response = ui.interact(ui.available_rect_before_wrap(), Id::new("Hierarchy"), egui::Sense::click());
+    response.context_menu(|ui| {
+        hierarchy_context(
+            ui,
+            &mut commands,
+            &mut changes,
+            &mut selected,
+            &mut *menu_state,
+            &ui_reg,
+        );
+    });
 }
 
 type DrawIter<'a> = (
@@ -184,21 +208,33 @@ fn draw_entity<F: QueryFilter>(
     query: &Query<DrawIter, F>,
     entity: Entity,
     selected: &mut Query<Entity, With<Selected>>,
+    disabled: &mut Query<Entity, With<Disabled>>,
     clone_events: &mut EventWriter<CloneEvent>,
     changes: &mut EventWriter<NewChange>,
     auto_children: &Query<(), With<SceneAutoChild>>,
     menu_state: &mut MenuHierarchyState,
+    ui_reg: &Res<BundleReg>,
+    locked_entities: &mut Query<Entity, With<Locked>>
 ) {
     let Ok((_, name, children, parent)) = query.get(entity) else {
         return;
     };
 
-    let entity_name = name.map_or_else(
+    let mut entity_name = name.map_or_else(
         || format!("Entity ({})", entity),
         |name| format!("{} ({})", name.as_str(), entity),
     );
 
+
     let is_selected = selected.contains(entity);
+    let is_disabled = disabled.contains(entity);
+    let is_locked = locked_entities.contains(entity);
+    let disabled_color = egui::Color32::from_rgb(128, 128, 128);
+    let locked_icon = "🔒";
+
+    if is_locked {
+        entity_name = format!("{} {}", entity_name.clone(), locked_icon);
+    }
 
     if children.is_some_and(|children| children.iter().any(|child| query.get(*child).is_ok())) {
         CollapsingState::load_with_default_open(
@@ -207,7 +243,13 @@ fn draw_entity<F: QueryFilter>(
             true,
         )
         .show_header(ui, |ui| {
-            let mut entity_name = egui::RichText::new(entity_name.clone());
+            let mut entity_name = egui::RichText::new(entity_name.clone()).color(
+                if is_disabled {
+                    disabled_color
+                } else {
+                    egui::Color32::PLACEHOLDER
+                }
+            );
             let is_auto_child = auto_children.get(entity).is_ok();
             if is_auto_child {
                 entity_name = entity_name.italics();
@@ -232,7 +274,9 @@ fn draw_entity<F: QueryFilter>(
                         clone_events,
                         selected,
                         menu_state,
+                        ui_reg,
                         parent,
+                        locked_entities
                     );
                 });
             }
@@ -263,15 +307,24 @@ fn draw_entity<F: QueryFilter>(
                     query,
                     *child,
                     selected,
+                    disabled,
                     clone_events,
                     changes,
                     auto_children,
                     menu_state,
+                    ui_reg,
+                    locked_entities
                 );
             }
         });
     } else {
-        let mut entity_name = egui::RichText::new(format!("      {}", entity_name));
+        let mut entity_name = egui::RichText::new(format!("      {}", entity_name)).color(
+            if is_disabled {
+                disabled_color
+            } else {
+                egui::Color32::PLACEHOLDER
+            }
+        );
         let is_auto_child = auto_children.get(entity).is_ok();
         if is_auto_child {
             entity_name = entity_name.italics();
@@ -297,7 +350,9 @@ fn draw_entity<F: QueryFilter>(
                     clone_events,
                     selected,
                     menu_state,
+                    ui_reg,
                     parent,
+                    locked_entities
                 );
             });
         }
@@ -321,33 +376,103 @@ fn draw_entity<F: QueryFilter>(
     };
 }
 
+fn hierarchy_context(
+    ui: &mut egui::Ui,
+    mut commands: &mut Commands<'_, '_>,
+    changes: &mut EventWriter<'_, NewChange>,
+    selected: &mut Query<'_, '_, Entity, With<Selected>>,
+    menu_state: &mut MenuHierarchyState,
+    ui_reg: &Res<BundleReg>,
+) {
+    ui.menu_button("Add", |ui| {
+        if ui.button("Empty").clicked() {
+            let new_id = commands.spawn_empty().insert(PrefabMarker).id();
+            changes.send(NewChange {
+                change: Arc::new(AddedEntity { entity: new_id }),
+            });
+            ui.close_menu();
+        }
+        for (category_name, category_bundle) in ui_reg.bundles.iter() {
+            ui.menu_button(category_name, |ui| {
+                let mut categories_vec: Vec<(
+                    &String,
+                    &EditorBundleUntyped,
+                )> = category_bundle.iter().collect();
+                categories_vec.sort_by(|a, b| a.0.cmp(b.0));
+
+                for (name, dyn_bundle) in categories_vec {
+                    let button = egui::Button::new(name).ui(ui);
+                    if button.clicked() {
+                        let entity = dyn_bundle.spawn(&mut commands);
+                        changes.send(NewChange {
+                            change: Arc::new(AddedEntity { entity }),
+                        });
+                        ui.close_menu();
+                    }
+                }
+            });
+        }
+    });
+}
+
 fn hierarchy_entity_context(
     ui: &mut egui::Ui,
-    commands: &mut Commands<'_, '_>,
+    mut commands: &mut Commands<'_, '_>,
     entity: Entity,
     changes: &mut EventWriter<'_, NewChange>,
     clone_events: &mut EventWriter<'_, CloneEvent>,
     selected: &mut Query<'_, '_, Entity, With<Selected>>,
     menu_state: &mut MenuHierarchyState,
+    ui_reg: &Res<BundleReg>,
     parent: Option<&Parent>,
+    locked_entities: &mut Query<Entity, With<Locked>>
 ) {
-    if ui.button("Add child").clicked() {
-        let new_id = commands.spawn_empty().insert(PrefabMarker).id();
-        commands.entity(entity).add_child(new_id);
-        changes.send(NewChange {
-            change: Arc::new(AddedEntity { entity: new_id }),
+    let contains_locked_entity = locked_entities.contains(entity);
+    if !contains_locked_entity {
+        ui.menu_button("Add child", |ui| {
+            if ui.button("Empty").clicked() {
+                for parent in selected.iter() {
+                    let new_id = commands.spawn_empty().insert(PrefabMarker).id();
+                    commands.entity(parent).add_child(new_id);
+                    changes.send(NewChange {
+                        change: Arc::new(AddedEntity { entity: new_id }),
+                    });
+                }
+            }
+            for (category_name, category_bundle) in ui_reg.bundles.iter() {
+                ui.menu_button(category_name, |ui| {
+                    let mut categories_vec: Vec<(
+                        &String,
+                        &EditorBundleUntyped,
+                    )> = category_bundle.iter().collect();
+                    categories_vec.sort_by(|a, b| a.0.cmp(b.0));
+
+                    for (name, dyn_bundle) in categories_vec {
+                        let button = egui::Button::new(name).ui(ui);
+                        if button.clicked() {
+                            for parent in selected.iter() {
+                                let new_id = dyn_bundle.spawn(&mut commands);
+                                commands.entity(parent).add_child(new_id);
+                                changes.send(NewChange {
+                                    change: Arc::new(AddedEntity { entity: new_id }),
+                                });
+                                ui.close_menu();
+                            }
+                        }
+                    }
+                });
+            }
         });
-        ui.close_menu();
-    }
-    if ui.button("Delete").clicked() {
-        let entities: Vec<Entity> = selected.iter().collect();
-        for e in entities {
-            commands.entity(e).despawn_recursive();
-            changes.send(NewChange {
-                change: Arc::new(RemovedEntity { entity: e }),
-            });
+        if ui.button("Delete").clicked() {
+            let entities: Vec<Entity> = selected.iter().collect();
+            for e in entities {
+                commands.entity(e).despawn_recursive();
+                changes.send(NewChange {
+                    change: Arc::new(RemovedEntity { entity: e }),
+                });
+            }
+            ui.close_menu();
         }
-        ui.close_menu();
     }
     if ui.button("Clone").clicked() {
         let entities: Vec<Entity> = selected.iter().collect();
@@ -384,7 +509,7 @@ fn hierarchy_entity_context(
 #[derive(Component)]
 pub struct ClonedEntity;
 
-fn clone_enitites(
+fn clone_entities(
     mut commands: Commands,
     query: Query<EntityRef>,
     mut events: EventReader<CloneEvent>,

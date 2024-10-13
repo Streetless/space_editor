@@ -15,6 +15,8 @@ use crate::{
 
 pub struct GizmoToolPlugin;
 
+use crate::inspector::Locked;
+
 impl Plugin for GizmoToolPlugin {
     #[cfg(not(tarpaulin_include))]
     fn build(&self, app: &mut App) {
@@ -209,7 +211,7 @@ impl EditorTool for GizmoTool {
         };
 
         let selected = world
-            .query_filtered::<Entity, With<Selected>>()
+            .query_filtered::<Entity, (With<Selected>, Without<Locked>)>()
             .iter(world)
             .collect::<Vec<_>>();
         let mut disable_pan_orbit = false;
