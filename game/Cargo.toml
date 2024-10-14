@@ -16,4 +16,4 @@ required-features = ["bevy_xpbd_3d"]
 [dependencies]
 bevy.workspace = true
 space_prefab.workspace = true
-workspace-hakari = { version = "0.1", path = "../workspace-hakari" }
+#workspace-hakari = { version = "0.1", path = "../workspace-hakari" }

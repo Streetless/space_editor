@@ -16,10 +16,11 @@ bevy.workspace = true
 
 anyhow.workspace = true
 bevy-inspector-egui.workspace = true
-egui_file.workspace = true
+#egui_file.workspace = true
+rfd.workspace = true
 egui-toast.workspace = true
 image.workspace = true
-workspace-hakari = { version = "0.1", path = "../../workspace-hakari" }
+#workspace-hakari = { version = "0.1", path = "../../workspace-hakari" }
 
 [lints]
 workspace = true

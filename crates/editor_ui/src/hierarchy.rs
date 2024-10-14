@@ -10,17 +10,21 @@ use space_editor_core::prelude::*;
 use space_prefab::{component::SceneAutoChild, editor_registry::EditorRegistry};
 use space_undo::{AddedEntity, NewChange, RemovedEntity, UndoSet};
 use space_prefab::save::BundleEntity;
-use crate::ext::egui_file;
 use bevy_egui::egui::{Id, Widget};
 use space_prefab::editor_registry::EditorRegistryExt;
 use crate::prelude::{BundleReg, Disabled, Locked};
 use crate::ui_registration::EditorBundleUntyped;
+use std::path::{Path, PathBuf};
+use bevy::asset::AssetPath;
+use bevy::asset::io::AssetSourceId;
+use crate::ext::{rfd};
 
 use space_shared::*;
 
 use space_editor_tabs::prelude::*;
 
 use crate::{colors::WARN_COLOR, editor_tab_name::EditorTabName};
+use space_shared::FileType;
 
 /// Event to clone entity with clone all registered components
 #[derive(Event)]
@@ -34,7 +38,7 @@ pub struct SpaceHierarchyPlugin {}
 
 #[derive(Resource, Default)]
 pub struct MenuHierarchyState {
-    create_bundle_dialog: Option<egui_file::FileDialog>,
+    create_bundle_path: Option<PathBuf>,
 }
 
 impl Plugin for SpaceHierarchyPlugin {
@@ -155,32 +159,18 @@ pub fn show_hierarchy(
             }
         }
     });
-    if let Some(create_bundle_dialog) = &mut menu_state.create_bundle_dialog {
-        if create_bundle_dialog.show(ctx).selected() {
-            if let Some(file) = create_bundle_dialog.path() {
-                let path = file.to_str().unwrap().to_string();
-                //remove assets/ from path
-                if path.ends_with(".bundle.ron") {
-                    let path = path.replace(".bundle.ron", "");
-                    println!("{path}");
-                    editor_events.send(EditorEvent::CreateBundle(EditorPrefabPath::File(
-                        format!("{}.bundle.ron", path),
-                    )));
-                }
+    if let Some(create_bundle_path) = &mut menu_state.create_bundle_path {
+        if let Some(file) = create_bundle_path.to_str() {
+            let mut path = file.to_string();
+            //remove assets/ from path
+            if path.ends_with(format!(".{}", FileType::Bundle).as_str()) {
+                path = path.replace(format!(".{}", FileType::Bundle).as_str(), "");
             }
-        } else {
-            let mut need_move_to_default_dir = false;
-            if let Some(path) = create_bundle_dialog.directory().to_str() {
-                if !path.contains("assets") {
-                    need_move_to_default_dir = true;
-                }
-            } else {
-                need_move_to_default_dir = true;
-            }
-            if need_move_to_default_dir {
-                create_bundle_dialog.set_path("assets/");
-            }
+            editor_events.send(EditorEvent::CreateBundle(EditorPrefabPath::File(
+                format!("{}.{}", path, FileType::Bundle),
+            )));
         }
+        menu_state.create_bundle_path = None;
     };
     let response = ui.interact(ui.available_rect_before_wrap(), Id::new("Hierarchy"), egui::Sense::click());
     response.context_menu(|ui| {
@@ -488,12 +478,19 @@ fn hierarchy_entity_context(
             commands.entity(entity).insert(BundleEntity);
         }
         ui.close_menu();
-        let mut create_bundle_dialog =
-            egui_file::FileDialog::save_file(Some("./assets/bundles".into()))
-                .default_filename("NewBundle.bundle.ron")
-                .title("Create bundle");
-        create_bundle_dialog.open();
-        menu_state.create_bundle_dialog = Some(create_bundle_dialog);
+        let source = AssetSourceId::from("project");
+        let path = Path::new("assets");
+        let binding = AssetPath::from_path(path).with_source(source);
+        let asset_path = binding.path().canonicalize().unwrap();
+        let asset_path = asset_path.as_path();
+        let starting_directory = asset_path.join("Bundle").canonicalize().unwrap();
+        let starting_directory = starting_directory.as_path();
+        let path = rfd::FileDialog::new()
+            .set_title("Create bundle")
+            .set_directory(starting_directory)
+            .set_file_name(format!("Bundle0.{}", FileType::Bundle))
+            .save_file();
+        menu_state.create_bundle_path = path;
     }
     //End create bundle
     if !selected.is_empty() && !selected.contains(entity) && ui.button("Attach to").clicked() {

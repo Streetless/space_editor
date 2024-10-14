@@ -14,7 +14,7 @@ homepage.workspace = true
 [dependencies]
 bevy = "0.14"
 space_editor = { path = "../../"}
-workspace-hakari = { version = "0.1", path = "../../workspace-hakari" }
+#workspace-hakari = { version = "0.1", path = "../../workspace-hakari" }
 
 [lints]
 workspace = true

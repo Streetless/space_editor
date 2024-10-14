@@ -35,7 +35,7 @@ bevy_asset_loader.workspace = true
 bevy_panorbit_camera.workspace = true
 bevy_mod_billboard.workspace = true
 anyhow.workspace = true
-workspace-hakari = { version = "0.1", path = "../../workspace-hakari" }
+#workspace-hakari = { version = "0.1", path = "../../workspace-hakari" }
 
 [lints]
 workspace = true

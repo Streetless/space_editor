@@ -1,5 +1,4 @@
 use bevy::{prelude::*, window::WindowResolution};
-use game_lib::GamePlugin;
 use space_editor::SpaceEditorPlugin;
 use space_editor_ui::{game_mode_changed, settings::GameModeSettings, simple_editor_setup};
 
@@ -23,7 +22,7 @@ fn main() {
         }),
         ..default()
     }))
-    .add_plugins((SpaceEditorPlugin, GamePlugin))
+    .add_plugins(SpaceEditorPlugin)
     .add_systems(Startup, simple_editor_setup)
     .add_systems(
         PreUpdate,
