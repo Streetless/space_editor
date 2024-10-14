@@ -478,19 +478,19 @@ fn hierarchy_entity_context(
             commands.entity(entity).insert(BundleEntity);
         }
         ui.close_menu();
-        let source = AssetSourceId::from("project");
-        let path = Path::new("assets");
-        let binding = AssetPath::from_path(path).with_source(source);
-        let asset_path = binding.path().canonicalize().unwrap();
-        let asset_path = asset_path.as_path();
-        let starting_directory = asset_path.join("Bundle").canonicalize().unwrap();
-        let starting_directory = starting_directory.as_path();
-        let path = rfd::FileDialog::new()
-            .set_title("Create bundle")
-            .set_directory(starting_directory)
-            .set_file_name(format!("Bundle0.{}", FileType::Bundle))
-            .save_file();
-        menu_state.create_bundle_path = path;
+        // let source = AssetSourceId::from("project");
+        // let path = Path::new("assets");
+        // let binding = AssetPath::from_path(path).with_source(source);
+        // let asset_path = binding.path().canonicalize().unwrap();
+        // let asset_path = asset_path.as_path();
+        // let starting_directory = asset_path.join("Bundle").canonicalize().unwrap();
+        // let starting_directory = starting_directory.as_path();
+        // let path = rfd::FileDialog::new()
+        //     .set_title("Create bundle")
+        //     .set_directory(starting_directory)
+        //     .set_file_name(format!("Bundle0.{}", FileType::Bundle))
+        //     .save_file();
+        // menu_state.create_bundle_path = path;
     }
     //End create bundle
     if !selected.is_empty() && !selected.contains(entity) && ui.button("Attach to").clicked() {

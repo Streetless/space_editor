@@ -17,7 +17,7 @@ pub struct EditorUiPlugin {
 impl Default for EditorUiPlugin {
     fn default() -> Self {
         Self {
-            use_standard_layout: true,
+            use_standard_layout: false,
         }
     }
 }

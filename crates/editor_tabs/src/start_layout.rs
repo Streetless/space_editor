@@ -20,13 +20,15 @@ pub trait GroupLayout<G>: StartLayout {
 pub enum DoublePanel {
     TopLeft,
     BottomLeft,
+    BottomCenter,
     Main,
 }
 
 #[derive(Default, Resource)]
 pub struct DoublePanelGroup {
     pub top_panel: Vec<TabNameHolder>,
-    pub bottom_panel: Vec<TabNameHolder>,
+    pub bottom_left_panel: Vec<TabNameHolder>,
+    pub bottom_center_panel: Vec<TabNameHolder>,
     pub main_panel: Vec<TabNameHolder>,
 }
 
@@ -34,7 +36,7 @@ impl StartLayout for DoublePanelGroup {
     fn build(&self) -> egui_dock::DockState<TabNameHolder> {
         let mut state = egui_dock::DockState::new(self.main_panel.clone());
 
-        let [_game, panels] = state.main_surface_mut().split_left(
+        let [game, panels] = state.main_surface_mut().split_left(
             egui_dock::NodeIndex::root(),
             0.2,
             self.top_panel.clone(),
@@ -42,7 +44,15 @@ impl StartLayout for DoublePanelGroup {
 
         let [_, _] = state
             .main_surface_mut()
-            .split_below(panels, 0.3, self.bottom_panel.clone());
+            .split_below(
+                game,
+                0.7,
+                self.bottom_center_panel.clone(),
+            );
+
+        let [_, _] = state
+            .main_surface_mut()
+            .split_below(panels, 0.3, self.bottom_left_panel.clone());
 
         state
     }
@@ -52,7 +62,8 @@ impl GroupLayout<DoublePanel> for DoublePanelGroup {
     fn push<N: TabName>(&mut self, group: DoublePanel, tab: N) {
         match group {
             DoublePanel::TopLeft => self.top_panel.push(tab.into()),
-            DoublePanel::BottomLeft => self.bottom_panel.push(tab.into()),
+            DoublePanel::BottomLeft => self.bottom_left_panel.push(tab.into()),
+            DoublePanel::BottomCenter => self.bottom_center_panel.push(tab.into()),
             DoublePanel::Main => self.main_panel.push(tab.into()),
         }
     }
@@ -60,7 +71,8 @@ impl GroupLayout<DoublePanel> for DoublePanelGroup {
     fn push_front<N: TabName>(&mut self, group: DoublePanel, tab: N) {
         match group {
             DoublePanel::TopLeft => self.top_panel.insert(0, tab.into()),
-            DoublePanel::BottomLeft => self.bottom_panel.insert(0, tab.into()),
+            DoublePanel::BottomLeft => self.bottom_left_panel.insert(0, tab.into()),
+            DoublePanel::BottomCenter => self.bottom_center_panel.insert(0, tab.into()),
             DoublePanel::Main => self.main_panel.insert(0, tab.into()),
         }
     }
