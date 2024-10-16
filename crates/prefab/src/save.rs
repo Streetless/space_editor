@@ -6,7 +6,6 @@ use bevy::{
 };
 use space_shared::{EditorPrefabPath, PrefabMarker, PrefabMemoryCache};
 use std::{any::TypeId, fs, io::Write};
-
 use crate::prelude::{EditorRegistry, EditorRegistryExt, SceneAutoChild};
 
 #[derive(Reflect, Default, Component, Clone)]

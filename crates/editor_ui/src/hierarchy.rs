@@ -90,7 +90,8 @@ pub fn show_hierarchy(
     mut ctxs: EguiContexts,
     mut editor_events: EventWriter<EditorEvent>,
     ui_reg: Res<BundleReg>,
-    mut locked_entities: Query<Entity, With<Locked>>
+    mut locked_entities: Query<Entity, With<Locked>>,
+    global_resource: Res<GlobalResource>
 ) {
     let ctx = ctxs.ctx_mut();
     let mut all: Vec<_> = if state.show_editor_entities {
@@ -138,7 +139,8 @@ pub fn show_hierarchy(
                         &auto_children,
                         &mut menu_state,
                         &ui_reg,
-                        &mut locked_entities
+                        &mut locked_entities,
+                        &global_resource
                     );
                 } else {
                     draw_entity::<With<PrefabMarker>>(
@@ -153,7 +155,8 @@ pub fn show_hierarchy(
                         &auto_children,
                         &mut menu_state,
                         &ui_reg,
-                        &mut locked_entities
+                        &mut locked_entities,
+                        &global_resource
                     );
                 }
             }
@@ -204,7 +207,8 @@ fn draw_entity<F: QueryFilter>(
     auto_children: &Query<(), With<SceneAutoChild>>,
     menu_state: &mut MenuHierarchyState,
     ui_reg: &Res<BundleReg>,
-    locked_entities: &mut Query<Entity, With<Locked>>
+    locked_entities: &mut Query<Entity, With<Locked>>,
+    global_resource: &Res<GlobalResource>
 ) {
     let Ok((_, name, children, parent)) = query.get(entity) else {
         return;
@@ -266,7 +270,8 @@ fn draw_entity<F: QueryFilter>(
                         menu_state,
                         ui_reg,
                         parent,
-                        locked_entities
+                        locked_entities,
+                        global_resource
                     );
                 });
             }
@@ -303,7 +308,8 @@ fn draw_entity<F: QueryFilter>(
                     auto_children,
                     menu_state,
                     ui_reg,
-                    locked_entities
+                    locked_entities,
+                    global_resource,
                 );
             }
         });
@@ -342,7 +348,8 @@ fn draw_entity<F: QueryFilter>(
                     menu_state,
                     ui_reg,
                     parent,
-                    locked_entities
+                    locked_entities,
+                    global_resource
                 );
             });
         }
@@ -415,7 +422,8 @@ fn hierarchy_entity_context(
     menu_state: &mut MenuHierarchyState,
     ui_reg: &Res<BundleReg>,
     parent: Option<&Parent>,
-    locked_entities: &mut Query<Entity, With<Locked>>
+    locked_entities: &mut Query<Entity, With<Locked>>,
+    global_resource: &Res<GlobalResource>
 ) {
     let contains_locked_entity = locked_entities.contains(entity);
     if !contains_locked_entity {
@@ -478,19 +486,16 @@ fn hierarchy_entity_context(
             commands.entity(entity).insert(BundleEntity);
         }
         ui.close_menu();
-        // let source = AssetSourceId::from("project");
-        // let path = Path::new("assets");
-        // let binding = AssetPath::from_path(path).with_source(source);
-        // let asset_path = binding.path().canonicalize().unwrap();
-        // let asset_path = asset_path.as_path();
-        // let starting_directory = asset_path.join("Bundle").canonicalize().unwrap();
-        // let starting_directory = starting_directory.as_path();
-        // let path = rfd::FileDialog::new()
-        //     .set_title("Create bundle")
-        //     .set_directory(starting_directory)
-        //     .set_file_name(format!("Bundle0.{}", FileType::Bundle))
-        //     .save_file();
-        // menu_state.create_bundle_path = path;
+        let path = global_resource.project_path.clone();
+        let asset_path = path.join("assets");
+        let starting_directory = asset_path.join("bundles").canonicalize().unwrap();
+        let starting_directory = starting_directory.as_path();
+        let path = rfd::FileDialog::new()
+            .set_title("Create bundle")
+            .set_directory(starting_directory)
+            .set_file_name(format!("Bundle0.{}", FileType::Bundle))
+            .save_file();
+        menu_state.create_bundle_path = path;
     }
     //End create bundle
     if !selected.is_empty() && !selected.contains(entity) && ui.button("Attach to").clicked() {

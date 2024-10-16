@@ -307,311 +307,308 @@ pub fn top_menu(
     background_tasks: Res<BackgroundTaskStorage>,
     toasts: Res<ToastStorage>,
     sizing: Res<Sizing>,
+    global_resource: Res<GlobalResource>,
 ) {
     let ctx = match ctxs.try_ctx_mut() {
         Some(ctx) => ctx,
         None => return,
     };
 
-    // let source = AssetSourceId::from("project");
-    // let path = Path::new("assets");
-    // let binding = AssetPath::from_path(path).with_source(source);
-    // let asset_path = binding.path().canonicalize().unwrap();
-    // let asset_path = asset_path.as_path();
-    //
-    // egui::TopBottomPanel::top("top_menu_bar")
-    //     .min_height(&sizing.icon.to_size() + 8.)
-    //     .show(ctx, |ui| {
-    //         ui.style_mut().spacing.menu_margin = Margin::symmetric(16., 8.);
-    //         egui::menu::bar(ui, |ui| {
-    //             let stl = ui.style_mut();
-    //             stl.spacing.button_padding = egui::Vec2::new(8., 4.);
-    //
-    //             // Open Scene TODO: Remove either this or load scene
-    //             let open_button = egui::Button::new(to_richtext("📂", &sizing.icon))
-    //                 .stroke(stroke_default_color());
-    //             if ui.add(open_button)
-    //                 .on_hover_text("Open Scene")
-    //                 .clicked()
-    //             {
-    //                 let starting_directory = asset_path.join("scenes").canonicalize().unwrap();
-    //                 let starting_directory = starting_directory.as_path();
-    //                 let path = rfd::FileDialog::new()
-    //                     .add_filter("Scene", &[FileType::Scene])
-    //                     .set_title(format!("File Explorer (Scene) (*.{})", FileType::Scene))
-    //                     .set_directory(starting_directory)
-    //                     .pick_file();
-    //                 menu_state.file_path = path;
-    //             }
-    //             if let Some(path) = &mut menu_state.file_path {
-    //                 if let Some(file) = path.to_str() {
-    //                     let mut path = file.to_string();
-    //                     menu_state.path = path;
-    //                     editor_events.send(EditorEvent::Load(EditorPrefabPath::File(
-    //                         menu_state.path.clone(),
-    //                     )));
-    //                     menu_state.file_path = None;
-    //                 }
-    //             }
-    //             // END Open Scene
-    //
-    //             // Save file
-    //             let file_button = egui::Button::new(to_richtext("💾", &sizing.icon))
-    //                 .stroke(stroke_default_color());
-    //             if ui
-    //                 .add(file_button)
-    //                 .on_hover_text("Save current scene")
-    //                 .clicked()
-    //             {
-    //                 let starting_directory = asset_path.join("scenes").canonicalize().unwrap();
-    //                 let starting_directory = starting_directory.as_path();
-    //                 let path = rfd::FileDialog::new()
-    //                     .set_title("Save scene")
-    //                     .set_directory(starting_directory)
-    //                     .set_file_name(format!("Scene0.{}", FileType::Scene))
-    //                     .save_file();
-    //                 menu_state.save_path = path;
-    //             }
-    //
-    //             if let Some(save_path) = &mut menu_state.save_path {
-    //                 if let Some(file) = save_path.to_str() {
-    //                     let mut path = file.to_string();
-    //                     //remove assets/ from path
-    //                     if path.ends_with(".scn.ron") {
-    //                         path = path.replace(".scn.ron", "");
-    //                     }
-    //                     editor_events.send(EditorEvent::Save(EditorPrefabPath::File(
-    //                         format!("{}.{}", path, FileType::Scene),
-    //                     )));
-    //                 }
-    //                 menu_state.save_path = None;
-    //             }
-    //             // End Save File
-    //
-    //             // Load Scene
-    //             let load_button = egui::Button::new(to_richtext("📤", &sizing.icon))
-    //                 .stroke(stroke_default_color());
-    //             if ui
-    //                 .add(load_button)
-    //                 .on_hover_text("Load scene file")
-    //                 .clicked()
-    //             {
-    //                 let starting_directory = asset_path.join("scenes").canonicalize().unwrap();
-    //                 let starting_directory = starting_directory.as_path();
-    //                 let path = rfd::FileDialog::new()
-    //                     .add_filter("Scene", &[FileType::Scene])
-    //                     .set_title(format!("Load Scene (*.{})", FileType::Scene))
-    //                     .set_directory(starting_directory)
-    //                     .pick_file();
-    //                 menu_state.load_path = path;
-    //             }
-    //
-    //             if let Some(path) = &mut menu_state.load_path {
-    //                 if let Some(file) = path.to_str() {
-    //                     let mut path = file.to_string();
-    //                     menu_state.path = path;
-    //                     editor_events.send(EditorEvent::Load(EditorPrefabPath::File(
-    //                         menu_state.path.clone(),
-    //                     )));
-    //                 }
-    //                 menu_state.load_path = None;
-    //             }
-    //             // END Load Scene
-    //
-    //             // Open GLTF
-    //             let open_gltf_button =
-    //                 prefab_icon(sizing.icon.to_size(), "").stroke(stroke_default_color());
-    //             if ui
-    //                 .add(open_gltf_button)
-    //                 .on_hover_text("Open GLTF/GLB as prefab")
-    //                 .clicked()
-    //             {
-    //                 let starting_directory = asset_path.join("models").canonicalize().unwrap();
-    //                 let starting_directory = starting_directory.as_path();
-    //                 let path = rfd::FileDialog::new()
-    //                     .add_filter("Model", &[FileType::GLTF, FileType::GLB])
-    //                     .set_title(format!("Opens {}/{} as Prefab", FileType::GLTF, FileType::GLB))
-    //                     .set_directory(starting_directory)
-    //                     .pick_file();
-    //                 menu_state.gltf_path = path;
-    //             }
-    //
-    //             if let Some(gltf_path) = &mut menu_state.gltf_path {
-    //                 if let Some(file) = gltf_path.to_str() {
-    //                     let path = file.to_string();
-    //                     editor_events.send(EditorEvent::LoadGltfAsPrefab(path));
-    //                 }
-    //                 menu_state.gltf_path = None;
-    //             }
-    //             // End Open GLTF
-    //
-    //             //Open subscene
-    //             let subscene_button = egui::Button::new(to_richtext("📦", &sizing.icon))
-    //                 .stroke(stroke_default_color());
-    //             if ui
-    //                 .add(subscene_button)
-    //                 .on_hover_text("Open subscene")
-    //                 .clicked()
-    //             {
-    //                 let starting_directory = asset_path.join("bundles").canonicalize().unwrap();
-    //                 let starting_directory = starting_directory.as_path();
-    //                 let path = rfd::FileDialog::new()
-    //                     .add_filter("Subscene", &[FileType::Scene, FileType::Bundle])
-    //                     .set_title(format!("Open Subscene (.{}, .{}", FileType::Scene, FileType::Bundle))
-    //                     .set_directory(starting_directory)
-    //                     .pick_file();
-    //                 menu_state.subscene_path = path;
-    //             }
-    //
-    //             if let Some(subscene_path) = &mut menu_state.subscene_path {
-    //                 if let Some(file) = subscene_path.to_str() {
-    //                     let mut path = file.to_string();
-    //                     info!("path: {}", path);
-    //                     if path.ends_with(".scn.ron") || path.ends_with(".bundle.ron") {
-    //                         let name = path.split('/').last().expect("No name");
-    //                         let name = name.split('\\').last().expect("No name");
-    //                         let name = name.replace(".scn.ron", "").replace(".bundle.ron", "");
-    //                         commands.spawn((PrefabBundle::new(&path, &name), PrefabMarker));
-    //                     } else {
-    //                         error!("Unknown file type: {}", path);
-    //                     }
-    //                 }
-    //                 menu_state.subscene_path = None;
-    //             }
-    //             //End of open subscene
-    //
-    //             //Export Scene
-    //             let export_button = egui::Button::new(to_richtext("💾", &sizing.icon))
-    //                 .stroke(stroke_default_color());
-    //             if ui
-    //                 .add(export_button)
-    //                 .on_hover_text("Export current scene")
-    //                 .clicked()
-    //             {
-    //                 let starting_directory = asset_path.join("scenes").canonicalize().unwrap();
-    //                 let starting_directory = starting_directory.as_path();
-    //                 let path = rfd::FileDialog::new()
-    //                     .set_title("Export scene")
-    //                     .set_directory(starting_directory)
-    //                     .set_file_name(format!("Scene0.scn.{}", FileType::Scene))
-    //                     .save_file();
-    //                 menu_state.export_path = path;
-    //             }
-    //             if let Some(export_path) = &mut menu_state.export_path {
-    //                 if let Some(file) = export_path.to_str() {
-    //                     let mut path = file.to_string();
-    //                     //remove assets/ from path
-    //                     if path.ends_with(format!(".{}", FileType::Scene).as_str()) {
-    //                         path = path.replace(format!(".{}", FileType::Scene).as_str(), "");
-    //                     }
-    //                     editor_events.send(EditorEvent::Export(EditorPrefabPath::File(
-    //                         format!("{}.{}", path, FileType::Scene),
-    //                     )));
-    //                 }
-    //                 menu_state.export_path = None;
-    //             };
-    //             //End of export    pub export_dialog: Option<egui_file::FileDialog>,
-    //
-    //             let width = ui.available_width();
-    //             let distance = width / 2. - 40.;
-    //             ui.add_space(distance);
-    //             let play_button =
-    //                 egui::Button::new(to_colored_richtext("▶", &sizing.icon, PLAY_COLOR))
-    //                     .fill(SPECIAL_BG_COLOR)
-    //                     .stroke(Stroke {
-    //                         width: 1.,
-    //                         color: STROKE_COLOR,
-    //                     });
-    //             if ui.add(play_button).clicked() {
-    //                 editor_events.send(EditorEvent::StartGame);
-    //             }
-    //
-    //             ui.with_layout(egui::Layout::right_to_left(egui::Align::RIGHT), |ui| {
-    //                 if toasts.has_toasts() {
-    //                     egui::Window::new("Errors")
-    //                         .default_size(egui::Vec2::new(80., 32.))
-    //                         .default_pos(egui::pos2(width, 32.))
-    //                         .movable(true)
-    //                         .resizable(true)
-    //                         .open(&mut menu_state.show_toasts)
-    //                         .show(ctx, |ui| {
-    //                             ui.vertical_centered_justified(|ui| {
-    //                                 if ui.add(egui::Button::new("Clear all 🗑")).clicked() {
-    //                                     clear_toast.send(ClearToastMessage::all());
-    //                                 };
-    //                             });
-    //                             egui::Grid::new("error_console_log").show(ui, |ui| {
-    //                                 for (index, error) in
-    //                                     toasts.toasts_per_kind.error.iter().enumerate()
-    //                                 {
-    //                                     ui.label(RichText::new("ERROR").color(ERROR_COLOR));
-    //                                     ui.label(error);
-    //                                     if ui.button("🗙").clicked() {
-    //                                         clear_toast.send(ClearToastMessage::error(index));
-    //                                     }
-    //                                     ui.end_row();
-    //                                 }
-    //                                 for (index, warning) in
-    //                                     toasts.toasts_per_kind.warning.iter().enumerate()
-    //                                 {
-    //                                     ui.label(RichText::new("WARN ").color(WARN_COLOR));
-    //                                     ui.label(warning);
-    //                                     if ui.button("🗙").clicked() {
-    //                                         clear_toast.send(ClearToastMessage::warn(index));
-    //                                     }
-    //                                     ui.end_row();
-    //                                 }
-    //                             })
-    //                         });
-    //                 }
-    //                 if ui
-    //                     .button(
-    //                         RichText::new(format!("⚠ {}", toasts.toasts_per_kind.warning.len()))
-    //                             .color(if toasts.has_toasts() {
-    //                                 WARN_COLOR
-    //                             } else {
-    //                                 STROKE_COLOR
-    //                             }),
-    //                     )
-    //                     .clicked()
-    //                 {
-    //                     menu_state.show_toasts = !menu_state.show_toasts;
-    //                 }
-    //                 if ui
-    //                     .button(
-    //                         RichText::new(format!("🚫 {}", toasts.toasts_per_kind.error.len()))
-    //                             .color(if toasts.has_toasts() {
-    //                                 ERROR_COLOR
-    //                             } else {
-    //                                 STROKE_COLOR
-    //                             }),
-    //                     )
-    //                     .clicked()
-    //                 {
-    //                     menu_state.show_toasts = !menu_state.show_toasts;
-    //                 }
-    //
-    //                 if !background_tasks.tasks.is_empty() {
-    //                     //Spinning circle
-    //                     ui.spinner();
-    //
-    //                     match &background_tasks.tasks[0] {
-    //                         BackgroundTask::AssetLoading(path, _) => {
-    //                             ui.label(format!("Loading {}", path));
-    //                         }
-    //                         BackgroundTask::None => {}
-    //                     }
-    //                 }
-    //             });
-    //         });
-    //     });
-    //
-    // for event in events.read() {
-    //     menu_state.path.clone_from(&event.path);
-    //     editor_events.send(EditorEvent::Load(EditorPrefabPath::File(format!(
-    //         "{}.scn.ron",
-    //         menu_state.path.clone()
-    //     ))));
-    // }
-    // events.clear();
+    let path = global_resource.project_path.clone();
+    let asset_path = path.join("assets");
+    egui::TopBottomPanel::top("top_menu_bar")
+        .min_height(&sizing.icon.to_size() + 8.)
+        .show(ctx, |ui| {
+            ui.style_mut().spacing.menu_margin = Margin::symmetric(16., 8.);
+            egui::menu::bar(ui, |ui| {
+                let stl = ui.style_mut();
+                stl.spacing.button_padding = egui::Vec2::new(8., 4.);
+
+                // Open Scene TODO: Remove either this or load scene
+                let open_button = egui::Button::new(to_richtext("📂", &sizing.icon))
+                    .stroke(stroke_default_color());
+                if ui.add(open_button)
+                    .on_hover_text("Open Scene")
+                    .clicked()
+                {
+                    let starting_directory = asset_path.join("scenes").canonicalize().unwrap();
+                    let starting_directory = starting_directory.as_path();
+                    let path = rfd::FileDialog::new()
+                        .add_filter("Scene", &[FileType::Scene])
+                        .set_title(format!("File Explorer (Scene) (*.{})", FileType::Scene))
+                        .set_directory(starting_directory)
+                        .pick_file();
+                    menu_state.file_path = path;
+                }
+                if let Some(path) = &mut menu_state.file_path {
+                    if let Some(file) = path.to_str() {
+                        let mut path = file.to_string();
+                        menu_state.path = path;
+                        editor_events.send(EditorEvent::Load(EditorPrefabPath::File(
+                            menu_state.path.clone(),
+                        )));
+                        menu_state.file_path = None;
+                    }
+                }
+                // END Open Scene
+
+                // Save file
+                let file_button = egui::Button::new(to_richtext("💾", &sizing.icon))
+                    .stroke(stroke_default_color());
+                if ui
+                    .add(file_button)
+                    .on_hover_text("Save current scene")
+                    .clicked()
+                {
+                    let starting_directory = asset_path.join("scenes").canonicalize().unwrap();
+                    let starting_directory = starting_directory.as_path();
+                    let path = rfd::FileDialog::new()
+                        .set_title("Save scene")
+                        .set_directory(starting_directory)
+                        .set_file_name(format!("Scene0.{}", FileType::Scene))
+                        .save_file();
+                    menu_state.save_path = path;
+                }
+
+                if let Some(save_path) = &mut menu_state.save_path {
+                    if let Some(file) = save_path.to_str() {
+                        let mut path = file.to_string();
+                        //remove assets/ from path
+                        if path.ends_with(".scn.ron") {
+                            path = path.replace(".scn.ron", "");
+                        }
+                        editor_events.send(EditorEvent::Save(EditorPrefabPath::File(
+                            format!("{}.{}", path, FileType::Scene),
+                        )));
+                    }
+                    menu_state.save_path = None;
+                }
+                // End Save File
+
+                // Load Scene
+                let load_button = egui::Button::new(to_richtext("📤", &sizing.icon))
+                    .stroke(stroke_default_color());
+                if ui
+                    .add(load_button)
+                    .on_hover_text("Load scene file")
+                    .clicked()
+                {
+                    let starting_directory = asset_path.join("scenes").canonicalize().unwrap();
+                    let starting_directory = starting_directory.as_path();
+                    let path = rfd::FileDialog::new()
+                        .add_filter("Scene", &[FileType::Scene])
+                        .set_title(format!("Load Scene (*.{})", FileType::Scene))
+                        .set_directory(starting_directory)
+                        .pick_file();
+                    menu_state.load_path = path;
+                }
+
+                if let Some(path) = &mut menu_state.load_path {
+                    if let Some(file) = path.to_str() {
+                        let mut path = file.to_string();
+                        menu_state.path = path;
+                        editor_events.send(EditorEvent::Load(EditorPrefabPath::File(
+                            menu_state.path.clone(),
+                        )));
+                    }
+                    menu_state.load_path = None;
+                }
+                // END Load Scene
+
+                // Open GLTF
+                let open_gltf_button =
+                    prefab_icon(sizing.icon.to_size(), "").stroke(stroke_default_color());
+                if ui
+                    .add(open_gltf_button)
+                    .on_hover_text("Open GLTF/GLB as prefab")
+                    .clicked()
+                {
+                    let starting_directory = asset_path.join("models").canonicalize().unwrap();
+                    let starting_directory = starting_directory.as_path();
+                    let path = rfd::FileDialog::new()
+                        .add_filter("Model", &[FileType::GLTF, FileType::GLB])
+                        .set_title(format!("Opens {}/{} as Prefab", FileType::GLTF, FileType::GLB))
+                        .set_directory(starting_directory)
+                        .pick_file();
+                    menu_state.gltf_path = path;
+                }
+
+                if let Some(gltf_path) = &mut menu_state.gltf_path {
+                    if let Some(file) = gltf_path.to_str() {
+                        let path = file.to_string();
+                        editor_events.send(EditorEvent::LoadGltfAsPrefab(path));
+                    }
+                    menu_state.gltf_path = None;
+                }
+                // End Open GLTF
+
+                //Open subscene
+                let subscene_button = egui::Button::new(to_richtext("📦", &sizing.icon))
+                    .stroke(stroke_default_color());
+                if ui
+                    .add(subscene_button)
+                    .on_hover_text("Open subscene")
+                    .clicked()
+                {
+                    let starting_directory = asset_path.join("bundles").canonicalize().unwrap();
+                    let starting_directory = starting_directory.as_path();
+                    let path = rfd::FileDialog::new()
+                        .add_filter("Subscene", &[FileType::Scene, FileType::Bundle])
+                        .set_title(format!("Open Subscene (.{}, .{}", FileType::Scene, FileType::Bundle))
+                        .set_directory(starting_directory)
+                        .pick_file();
+                    menu_state.subscene_path = path;
+                }
+
+                if let Some(subscene_path) = &mut menu_state.subscene_path {
+                    if let Some(file) = subscene_path.to_str() {
+                        let mut path = file.to_string();
+                        info!("path: {}", path);
+                        if path.ends_with(".scn.ron") || path.ends_with(".bundle.ron") {
+                            let name = path.split('/').last().expect("No name");
+                            let name = name.split('\\').last().expect("No name");
+                            let name = name.replace(".scn.ron", "").replace(".bundle.ron", "");
+                            commands.spawn((PrefabBundle::new(&path, &name), PrefabMarker));
+                        } else {
+                            error!("Unknown file type: {}", path);
+                        }
+                    }
+                    menu_state.subscene_path = None;
+                }
+                //End of open subscene
+
+                //Export Scene
+                let export_button = egui::Button::new(to_richtext("💾", &sizing.icon))
+                    .stroke(stroke_default_color());
+                if ui
+                    .add(export_button)
+                    .on_hover_text("Export current scene")
+                    .clicked()
+                {
+                    let starting_directory = asset_path.join("scenes").canonicalize().unwrap();
+                    let starting_directory = starting_directory.as_path();
+                    let path = rfd::FileDialog::new()
+                        .set_title("Export scene")
+                        .set_directory(starting_directory)
+                        .set_file_name(format!("Scene0.scn.{}", FileType::Scene))
+                        .save_file();
+                    menu_state.export_path = path;
+                }
+                if let Some(export_path) = &mut menu_state.export_path {
+                    if let Some(file) = export_path.to_str() {
+                        let mut path = file.to_string();
+                        //remove assets/ from path
+                        if path.ends_with(format!(".{}", FileType::Scene).as_str()) {
+                            path = path.replace(format!(".{}", FileType::Scene).as_str(), "");
+                        }
+                        editor_events.send(EditorEvent::Export(EditorPrefabPath::File(
+                            format!("{}.{}", path, FileType::Scene),
+                        )));
+                    }
+                    menu_state.export_path = None;
+                };
+                //End of export    pub export_dialog: Option<egui_file::FileDialog>,
+
+                let width = ui.available_width();
+                let distance = width / 2. - 40.;
+                ui.add_space(distance);
+                let play_button =
+                    egui::Button::new(to_colored_richtext("▶", &sizing.icon, PLAY_COLOR))
+                        .fill(SPECIAL_BG_COLOR)
+                        .stroke(Stroke {
+                            width: 1.,
+                            color: STROKE_COLOR,
+                        });
+                if ui.add(play_button).clicked() {
+                    editor_events.send(EditorEvent::StartGame);
+                }
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::RIGHT), |ui| {
+                    if toasts.has_toasts() {
+                        egui::Window::new("Errors")
+                            .default_size(egui::Vec2::new(80., 32.))
+                            .default_pos(egui::pos2(width, 32.))
+                            .movable(true)
+                            .resizable(true)
+                            .open(&mut menu_state.show_toasts)
+                            .show(ctx, |ui| {
+                                ui.vertical_centered_justified(|ui| {
+                                    if ui.add(egui::Button::new("Clear all 🗑")).clicked() {
+                                        clear_toast.send(ClearToastMessage::all());
+                                    };
+                                });
+                                egui::Grid::new("error_console_log").show(ui, |ui| {
+                                    for (index, error) in
+                                        toasts.toasts_per_kind.error.iter().enumerate()
+                                    {
+                                        ui.label(RichText::new("ERROR").color(ERROR_COLOR));
+                                        ui.label(error);
+                                        if ui.button("🗙").clicked() {
+                                            clear_toast.send(ClearToastMessage::error(index));
+                                        }
+                                        ui.end_row();
+                                    }
+                                    for (index, warning) in
+                                        toasts.toasts_per_kind.warning.iter().enumerate()
+                                    {
+                                        ui.label(RichText::new("WARN ").color(WARN_COLOR));
+                                        ui.label(warning);
+                                        if ui.button("🗙").clicked() {
+                                            clear_toast.send(ClearToastMessage::warn(index));
+                                        }
+                                        ui.end_row();
+                                    }
+                                })
+                            });
+                    }
+                    if ui
+                        .button(
+                            RichText::new(format!("⚠ {}", toasts.toasts_per_kind.warning.len()))
+                                .color(if toasts.has_toasts() {
+                                    WARN_COLOR
+                                } else {
+                                    STROKE_COLOR
+                                }),
+                        )
+                        .clicked()
+                    {
+                        menu_state.show_toasts = !menu_state.show_toasts;
+                    }
+                    if ui
+                        .button(
+                            RichText::new(format!("🚫 {}", toasts.toasts_per_kind.error.len()))
+                                .color(if toasts.has_toasts() {
+                                    ERROR_COLOR
+                                } else {
+                                    STROKE_COLOR
+                                }),
+                        )
+                        .clicked()
+                    {
+                        menu_state.show_toasts = !menu_state.show_toasts;
+                    }
+
+                    if !background_tasks.tasks.is_empty() {
+                        //Spinning circle
+                        ui.spinner();
+
+                        match &background_tasks.tasks[0] {
+                            BackgroundTask::AssetLoading(path, _) => {
+                                ui.label(format!("Loading {}", path));
+                            }
+                            BackgroundTask::None => {}
+                        }
+                    }
+                });
+            });
+        });
+
+    for event in events.read() {
+        menu_state.path.clone_from(&event.path);
+        editor_events.send(EditorEvent::Load(EditorPrefabPath::File(format!(
+            "{}.scn.ron",
+            menu_state.path.clone()
+        ))));
+    }
+    events.clear();
 }

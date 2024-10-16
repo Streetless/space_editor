@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use std::fmt::Display;
+use std::path::PathBuf;
 
 pub mod ext {
     pub use bevy_inspector_egui;
@@ -10,7 +11,7 @@ pub mod ext {
 pub mod prelude {
     pub use crate::{
         EditorCameraMarker, EditorEvent, EditorPrefabPath, EditorSet, EditorState, PrefabMarker,
-        PrefabMemoryCache, SelectParent,
+        PrefabMemoryCache, SelectParent, GlobalResource
     };
 }
 
@@ -86,6 +87,20 @@ pub struct SelectParent {
 #[derive(Component, Default, Clone, Reflect)]
 #[reflect(Component)]
 pub struct LightAreaToggle(pub bool);
+
+#[derive(Resource, Debug, Clone, Default)]
+pub struct GlobalResource {
+    /// The path to the project folder
+    pub project_path: PathBuf,
+    /// Visual Scripting Executable path
+    pub vs_path: PathBuf,
+    /// The path to the editor assets folder
+    pub editor_assets_path: PathBuf,
+    /// The tcp port
+    pub tcp_port: u16,
+    /// The access token
+    pub access_token: String,
+}
 
 pub enum FileType {
     Scene,
