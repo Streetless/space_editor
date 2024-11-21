@@ -217,7 +217,7 @@ pub enum PersistenceDataSource {
 
 impl Default for PersistenceDataSource {
     fn default() -> Self {
-        Self::File("editor.ron".to_string())
+        Self::File("assets://editor.ron".to_string())
     }
 }
 

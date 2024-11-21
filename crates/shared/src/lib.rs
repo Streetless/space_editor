@@ -104,6 +104,7 @@ pub struct GlobalResource {
 
 pub enum FileType {
     Scene,
+    ExportScene,
     Bundle,
     GLB,
     GLTF,
@@ -113,6 +114,7 @@ impl Display for FileType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let str = match self {
             FileType::Scene => "scn.ron".to_string(),
+            FileType::ExportScene => "scn.json".to_string(),
             FileType::Bundle => "bundle.ron".to_string(),
             FileType::GLB => "glb".to_string(),
             FileType::GLTF => "gltf".to_string(),
@@ -120,14 +122,3 @@ impl Display for FileType {
         write!(f, "{}", str)
     }
 }
-
-// impl From<FileType> for &'static str {
-//     fn from(file_type: FileType) -> Self {
-//         match file_type {
-//             FileType::Scene => "scn.ron",
-//             FileType::Bundle => "bundle.ron",
-//             FileType::GLB => "glb",
-//             FileType::GLTF => "gltf",
-//         }
-//     }
-// }

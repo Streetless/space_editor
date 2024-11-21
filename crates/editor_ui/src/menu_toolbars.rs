@@ -490,7 +490,7 @@ pub fn top_menu(
                     let path = rfd::FileDialog::new()
                         .set_title("Export scene")
                         .set_directory(starting_directory)
-                        .set_file_name(format!("Scene0.scn.{}", FileType::Scene))
+                        .set_file_name(format!("Scene0.{}", FileType::ExportScene))
                         .save_file();
                     menu_state.export_path = path;
                 }
@@ -498,16 +498,16 @@ pub fn top_menu(
                     if let Some(file) = export_path.to_str() {
                         let mut path = file.to_string();
                         //remove assets/ from path
-                        if path.ends_with(format!(".{}", FileType::Scene).as_str()) {
-                            path = path.replace(format!(".{}", FileType::Scene).as_str(), "");
+                        if path.ends_with(format!(".{}", FileType::ExportScene).as_str()) {
+                            path = path.replace(format!(".{}", FileType::ExportScene).as_str(), "");
                         }
                         editor_events.send(EditorEvent::Export(EditorPrefabPath::File(
-                            format!("{}.{}", path, FileType::Scene),
+                            format!("{}.{}", path, FileType::ExportScene),
                         )));
                     }
                     menu_state.export_path = None;
                 };
-                //End of export    pub export_dialog: Option<egui_file::FileDialog>,
+                //End of export
 
                 let width = ui.available_width();
                 let distance = width / 2. - 40.;
