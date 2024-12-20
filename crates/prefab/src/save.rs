@@ -103,10 +103,16 @@ pub struct GltfGrababble {
     pub grab_sides: GrabSides,
 }
 
-#[derive(Component, Default, Clone, Reflect)]
-#[reflect(Component)]
+#[derive(Component, Reflect, Clone, Default)]
+#[reflect(Component, Default)]
 pub struct Model {
     path: String,
+}
+
+impl Model {
+    pub fn new(path: String) -> Self {
+        Self { path }
+    }
 }
 
 impl Plugin for SavePrefabPlugin {
@@ -115,6 +121,7 @@ impl Plugin for SavePrefabPlugin {
         app.add_plugins(SaveResourcesPrefabPlugin {});
         app.editor_registry::<GltfRigidBody>();
         app.editor_registry::<GltfGrababble>();
+        app.editor_registry::<Model>();
         app.add_systems(
             OnEnter(SaveState::Save),
             (

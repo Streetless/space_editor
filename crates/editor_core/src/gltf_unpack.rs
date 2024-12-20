@@ -7,6 +7,7 @@ use bevy::{
 };
 
 use space_prefab::component::{AssetMaterial, AssetMesh, MaterialPrefab};
+use space_prefab::save::Model;
 use space_shared::PrefabMarker;
 
 use super::{BackgroundTask, BackgroundTaskStorage};
@@ -86,7 +87,6 @@ fn unpack_gltf(world: &mut World) {
         events.clear();
         loaded
     };
-
     let mut command_queue = CommandQueue::default();
     for gltf in loaded_scenes.iter() {
         let handle: Handle<Gltf> = gltf.0.clone();
@@ -203,6 +203,10 @@ fn spawn_node(
             PrefabMarker,
         ))
         .id();
+
+    if node.index == 0  {
+        commands.entity(id).insert(Model::new(ctx.gltf_path.path().display().to_string()));
+    }
 
     if let Some(handle) = &node.mesh {
         if let Some(mesh) = ctx.gltf_meshs.get(handle) {
