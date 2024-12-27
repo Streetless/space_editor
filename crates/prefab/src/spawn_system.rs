@@ -1,4 +1,4 @@
-use bevy::{prelude::*, sprite::Mesh2dHandle};
+use bevy::prelude::*;
 use bevy_scene_hook::SceneHook;
 #[cfg(feature = "editor")]
 use space_shared::toast::ToastMessage;
@@ -43,7 +43,9 @@ pub fn spawn_scene(
 
         commands
             .entity(e)
-            .insert(asset_server.load::<Scene>(format!("{}#{}", &prefab.path, &prefab.scene)))
+            .insert(SceneRoot(
+                asset_server.load::<Scene>(format!("{}#{}", &prefab.path, &prefab.scene)),
+            ))
             .insert(SceneHook::new(move |e, cmd| {
                 if e.contains::<SceneAutoRoot>() {
                     cmd.insert(WantChildPath);
@@ -54,12 +56,13 @@ pub fn spawn_scene(
                 }
             }));
 
-        if visibility.is_none() {
-            commands.entity(e).insert(VisibilityBundle::default());
-        }
-        if transform.is_none() {
-            commands.entity(e).insert(TransformBundle::default());
-        }
+        // required by SceneRoot and auto inserted with bevy 15
+        // if visibility.is_none() {
+        //     commands.entity(e).insert(VisibilityBundle::default());
+        // }
+        // if transform.is_none() {
+        //     commands.entity(e).insert(TransformBundle::default());
+        // }
     }
 }
 
@@ -99,7 +102,7 @@ pub fn sync_mesh(
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
     for (e, prefab) in query.iter() {
-        let mesh = meshes.add(prefab.to_mesh());
+        let mesh = Mesh3d(meshes.add(prefab.to_mesh()));
         commands.entity(e).insert(mesh);
     }
 }
@@ -112,7 +115,7 @@ pub fn sync_material(
     asset_server: Res<AssetServer>,
 ) {
     for (e, prefab) in query.iter() {
-        let mat = materials.add(prefab.to_material(&asset_server));
+        let mat = MeshMaterial3d(materials.add(prefab.to_material(&asset_server)));
         commands.entity(e).insert(mat);
     }
 }
@@ -124,7 +127,7 @@ pub fn sync_2d_mesh(
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
     for (e, prefab) in query.iter() {
-        let mesh = bevy::sprite::Mesh2dHandle(meshes.add(prefab.to_mesh()));
+        let mesh = Mesh2d(meshes.add(prefab.to_mesh()));
         commands.entity(e).insert(mesh);
     }
 }
@@ -137,7 +140,7 @@ pub fn sync_2d_material(
     asset_server: Res<AssetServer>,
 ) {
     for (e, prefab) in query.iter() {
-        let mat = materials.add(prefab.to_material(&asset_server));
+        let mat = MeshMaterial2d(materials.add(prefab.to_material(&asset_server)));
         commands.entity(e).insert(mat);
     }
 }
@@ -149,7 +152,7 @@ pub fn editor_remove_mesh(
 ) {
     for e in query.read() {
         if let Some(mut cmd) = commands.get_entity(e) {
-            cmd.remove::<Handle<Mesh>>();
+            cmd.remove::<Mesh3d>();
             info!("Removed mesh handle for {:?}", e);
         }
     }
@@ -162,7 +165,7 @@ pub fn editor_remove_mesh_2d(
 ) {
     for e in query.read() {
         if let Some(mut cmd) = commands.get_entity(e) {
-            cmd.remove::<Handle<Mesh>>().remove::<Mesh2dHandle>();
+            cmd.remove::<Mesh2d>();
             info!("Removed mesh handle for {:?}", e);
         }
     }
@@ -241,10 +244,7 @@ pub fn spawn_player_start(
         ));
         info!(msg);
         let child = commands
-            .spawn(DynamicSceneBundle {
-                scene: asset_server.load(prefab.prefab.to_string()),
-                ..default()
-            })
+            .spawn(DynamicSceneRoot(asset_server.load(prefab.prefab.to_string())))
             .id();
         commands.entity(e).add_child(child);
     }
@@ -306,7 +306,7 @@ mod tests {
 
         let mut query = app
             .world_mut()
-            .query::<(&MeshPrimitive2dPrefab, &Mesh2dHandle)>();
+            .query::<(&MeshPrimitive2dPrefab, &Mesh2d)>();
         assert_eq!(query.iter(&app.world_mut()).count(), 1);
     }
 
@@ -346,7 +346,7 @@ mod tests {
 
         let mut query = app
             .world_mut()
-            .query::<(&MeshPrimitive2dPrefab, &Mesh2dHandle)>();
+            .query::<(&MeshPrimitive2dPrefab, &Mesh2d)>();
         assert_eq!(query.iter(&app.world_mut()).count(), 1);
 
         let mut query = app
@@ -360,7 +360,7 @@ mod tests {
         app.update();
         let mut query = app
             .world_mut()
-            .query_filtered::<Entity, With<Mesh2dHandle>>();
+            .query_filtered::<Entity, With<Mesh2d>>();
         assert_eq!(query.iter(&app.world_mut()).count(), 0);
     }
 
@@ -556,7 +556,7 @@ mod tests {
 
         let mut query = app
             .world_mut()
-            .query::<(&Handle<Scene>, &SceneAutoRoot, &Visibility, &Transform)>();
+            .query::<(&SceneRoot, &SceneAutoRoot, &Visibility, &Transform)>();
 
         let s = query.single(&app.world());
 
@@ -593,7 +593,7 @@ mod tests {
 
         let mut query = app
             .world_mut()
-            .query::<(&Handle<Scene>, &Visibility, &Transform)>();
+            .query::<(&SceneRoot, &Visibility, &Transform)>();
 
         let s = query.single(&app.world());
 

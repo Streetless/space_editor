@@ -45,7 +45,8 @@ pub fn show_editor_ui(world: &mut World) {
     };
     let mut egui_context = egui_context.clone();
     let ctx = egui_context.get_mut();
-    egui_extras::install_image_loaders(ctx);
+    let oh = &*ctx;
+    egui_extras::install_image_loaders(oh);
 
     // set style for editor
     if let Some(editor_ui) = world.get_resource::<EditorUi>() {

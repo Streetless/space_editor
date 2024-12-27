@@ -15,6 +15,7 @@ use serde::ser::{SerializeMap, SerializeStruct, SerializeTuple};
 use serde::Serialize;
 use crate::prelude::{EditorRegistry, EditorRegistryExt, SceneAutoChild};
 use std::fmt::Display;
+use bevy::log::tracing_subscriber::fmt::writer::MakeWriterExt;
 
 #[derive(Reflect, Default, Component, Clone)]
 #[reflect(Component, MapEntities)]

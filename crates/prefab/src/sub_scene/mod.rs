@@ -4,7 +4,9 @@ use bevy::{
     ecs::world::unsafe_world_cell::UnsafeWorldCell, prelude::*, reflect::TypeRegistryArc,
     scene::serde::SceneDeserializer, utils::HashSet,
 };
+use bevy::log::tracing_subscriber::fmt::writer::MakeWriterExt;
 use serde::de::DeserializeSeed;
+use serde::Serialize;
 #[cfg(feature = "editor")]
 use space_shared::toast::ToastMessage;
 
@@ -67,7 +69,7 @@ fn clear_after_save(mut commands: Commands, queue: Query<Entity, With<CollapsedS
     }
 }
 
-pub fn prepare_auto_scene(world: &mut World) {
+pub fn prepare_auto_scene(app: &mut App, world: &mut World) {
     unsafe {
         let cell = world.as_unsafe_world_cell();
 
@@ -100,7 +102,7 @@ pub fn prepare_auto_scene(world: &mut World) {
 
             dyn_scene = recursive_extract(&cell, dyn_scene, *root_entity);
 
-            let scene = dyn_scene.build();
+            let scene = dyn_scene.build(app);
             //let Some(app_registry) = cell.world().get_resource::<AppTypeRegistry>() else {
             //    continue;
             //};
@@ -188,7 +190,7 @@ fn decompress_scene(
 
 fn apply_compressed_scenes(
     mut commands: Commands,
-    mut roots: Query<(Entity, &mut DecompressedScene, &Handle<Scene>, &Children)>,
+    mut roots: Query<(Entity, &mut DecompressedScene, &SceneRoot, &Children)>,
     child_tree: Query<(Entity, Option<&Children>, Option<&ChildPath>)>,
     editor_registry: Res<EditorRegistry>,
     asset_server: Res<AssetServer>,

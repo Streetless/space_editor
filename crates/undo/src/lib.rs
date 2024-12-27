@@ -6,6 +6,7 @@ mod tests;
 use std::sync::Arc;
 
 use bevy::{prelude::*, utils::HashMap};
+use bevy::reflect::ReflectMut;
 
 const MAX_REFLECT_RECURSION: i32 = 10;
 const AUTO_UNDO_LATENCY: i32 = 2;
@@ -169,7 +170,7 @@ fn undo_redo_logic(world: &mut World) {
     world.resource_scope::<Events<UndoRedo>, _>(|world, mut events| {
         world.resource_scope::<ChangeChain, _>(|world, mut change_chain| {
             {
-                let mut reader = events.get_reader();
+                let mut reader = events.get_cursor();
                 for event in reader.read(&events) {
                     match event {
                         UndoRedo::Undo => {
@@ -296,16 +297,19 @@ impl EditorChange for RemovedEntity {
         remap: &HashMap<Entity, Entity>,
     ) -> Result<ChangeResult, String> {
         if let Some(e) = remap.get(&self.entity) {
-            if world.get_entity(*e).is_none() {
-                let id = world
-                    .spawn_empty()
-                    .insert((UndoMarker, OneFrameUndoIgnore::default()))
-                    .id();
-                info!("Reverted Removed Entity: {}", e.index());
-                Ok(ChangeResult::SuccessWithRemap(vec![(self.entity, id)]))
-            } else {
-                info!("Reverted Removed Entity: {}", e.index());
-                Ok(ChangeResult::Success)
+            match world.get_entity(*e) {
+                Ok(_) => {
+                    info!("Reverted Removed Entity: {}", self.entity.index());
+                    Ok(ChangeResult::Success)
+                },
+                Err(_) => {
+                    let id = world
+                        .spawn_empty()
+                        .insert((UndoMarker, OneFrameUndoIgnore::default()))
+                        .id();
+                    info!("Reverted Removed Entity: {}", self.entity.index());
+                    Ok(ChangeResult::SuccessWithRemap(vec![(self.entity, id)]))
+                }
             }
         } else {
             let id = world
@@ -423,7 +427,7 @@ impl<T: Component + Clone> EditorChange for AddedComponent<T> {
     ) -> Result<ChangeResult, String> {
         let e = get_entity_with_remap(self.entity, entity_remap);
         let mut add_to_ignore = false;
-        if let Some(mut e) = world.get_entity_mut(e) {
+        if let Ok(mut e) = world.get_entity_mut(e) {
             e.remove::<T>().insert(OneFrameUndoIgnore::default());
             add_to_ignore = true;
         }
@@ -465,7 +469,7 @@ impl<T: Component + Reflect + FromReflect> EditorChange for ReflectedAddedCompon
         let dst = entity_remap
             .get(&self.entity)
             .map_or(self.entity, |remapped| *remapped);
-        if let Some(mut e) = world.get_entity_mut(dst) {
+        if let Ok(mut e) = world.get_entity_mut(dst) {
             e.remove::<T>().insert(OneFrameUndoIgnore::default());
         }
         world
@@ -511,12 +515,13 @@ impl<T: Component + Clone> EditorChange for RemovedComponent<T> {
         let mut remap = vec![];
         let dst = entity_remap.get(&self.entity).map_or_else(
             || {
-                if world.get_entity(self.entity).is_some() {
-                    self.entity
-                } else {
-                    let id = world.spawn_empty().id();
-                    remap.push((self.entity, id));
-                    id
+                match world.get_entity(self.entity) {
+                    Ok(_) => self.entity,
+                    Err(_) => {
+                        let id = world.spawn_empty().id();
+                        remap.push((self.entity, id));
+                        id
+                    }
                 }
             },
             |remapped| *remapped,
@@ -557,12 +562,13 @@ impl<T: Component + Reflect + FromReflect> EditorChange for ReflectedRemovedComp
         let mut remap = vec![];
         let dst = entity_remap.get(&self.entity).map_or_else(
             || {
-                if world.get_entity(self.entity).is_some() {
-                    self.entity
-                } else {
-                    let id = world.spawn_empty().id();
-                    remap.push((self.entity, id));
-                    id
+                match world.get_entity(self.entity) {
+                    Ok(_) => self.entity,
+                    Err(_) => {
+                        let id = world.spawn_empty().id();
+                        remap.push((self.entity, id));
+                        id
+                    }
                 }
             },
             |remapped| *remapped,
@@ -748,79 +754,90 @@ fn apply_for_every_typed_field<D: Reflect>(
     applyer: &dyn Fn(&mut D),
     max_recursion: i32,
 ) {
-    if max_recursion < 0 {
-        return;
-    }
-    #[allow(clippy::option_if_let_else)]
-    if let Some(v) = value.as_any_mut().downcast_mut::<D>() {
-        applyer(v);
-    } else {
-        match value.reflect_mut() {
-            bevy::reflect::ReflectMut::Struct(s) => {
-                for field_idx in 0..s.field_len() {
-                    apply_for_every_typed_field(
-                        s.field_at_mut(field_idx).unwrap(),
-                        applyer,
-                        max_recursion - 1,
-                    );
-                }
-            }
-            bevy::reflect::ReflectMut::TupleStruct(s) => {
-                for field_idx in 0..s.field_len() {
-                    apply_for_every_typed_field(
-                        s.field_mut(field_idx).unwrap(),
-                        applyer,
-                        max_recursion - 1,
-                    );
-                }
-            }
-            bevy::reflect::ReflectMut::Tuple(s) => {
-                for field_idx in 0..s.field_len() {
-                    apply_for_every_typed_field(
-                        s.field_mut(field_idx).unwrap(),
-                        applyer,
-                        max_recursion - 1,
-                    );
-                }
-            }
-            bevy::reflect::ReflectMut::List(s) => {
-                for field_idx in 0..s.len() {
-                    apply_for_every_typed_field(
-                        s.get_mut(field_idx).unwrap(),
-                        applyer,
-                        max_recursion - 1,
-                    )
-                }
-            }
-            bevy::reflect::ReflectMut::Array(s) => {
-                for field_idx in 0..s.len() {
-                    apply_for_every_typed_field(
-                        s.get_mut(field_idx).unwrap(),
-                        applyer,
-                        max_recursion - 1,
-                    );
-                }
-            }
-            bevy::reflect::ReflectMut::Map(s) => {
-                for field_idx in 0..s.len() {
-                    let (_key, value) = s.get_at_mut(field_idx).unwrap();
-                    apply_for_every_typed_field(value, applyer, max_recursion - 1);
-                }
-            }
-            bevy::reflect::ReflectMut::Enum(s) => {
-                for field_idx in 0..s.field_len() {
-                    apply_for_every_typed_field(
-                        s.field_at_mut(field_idx).unwrap(),
-                        applyer,
-                        max_recursion - 1,
-                    );
-                }
-            }
-            bevy::reflect::ReflectMut::Value(_v) => {
-                //do nothing. Value was checked before
-            }
-        }
-    }
+    // if max_recursion < 0 {
+    //     return;
+    // }
+    // #[allow(clippy::option_if_let_else)]
+    // if let Some(v) = value.as_any_mut().downcast_mut::<D>() {
+    //     applyer(v);
+    // } else {
+    //     match value.reflect_mut() {
+    //         bevy::reflect::ReflectMut::Struct(s) => {
+    //             for field_idx in 0..s.field_len() {
+    //                 apply_for_every_typed_field(
+    //                     s.field_at_mut(field_idx).unwrap(),
+    //                     applyer,
+    //                     max_recursion - 1,
+    //                 );
+    //             }
+    //         }
+    //         bevy::reflect::ReflectMut::TupleStruct(s) => {
+    //             for field_idx in 0..s.field_len() {
+    //                 apply_for_every_typed_field(
+    //                     s.field_mut(field_idx).unwrap(),
+    //                     applyer,
+    //                     max_recursion - 1,
+    //                 );
+    //             }
+    //         }
+    //         bevy::reflect::ReflectMut::Tuple(s) => {
+    //             for field_idx in 0..s.field_len() {
+    //                 apply_for_every_typed_field(
+    //                     s.field_mut(field_idx).unwrap(),
+    //                     applyer,
+    //                     max_recursion - 1,
+    //                 );
+    //             }
+    //         }
+    //         bevy::reflect::ReflectMut::List(s) => {
+    //             for field_idx in 0..s.len() {
+    //                 apply_for_every_typed_field(
+    //                     s.get_mut(field_idx).unwrap(),
+    //                     applyer,
+    //                     max_recursion - 1,
+    //                 )
+    //             }
+    //         }
+    //         bevy::reflect::ReflectMut::Array(s) => {
+    //             for field_idx in 0..s.len() {
+    //                 apply_for_every_typed_field(
+    //                     s.get_mut(field_idx).unwrap(),
+    //                     applyer,
+    //                     max_recursion - 1,
+    //                 );
+    //             }
+    //         }
+    //         bevy::reflect::ReflectMut::Map(s) => {
+    //             for field_idx in 0..s.len() {
+    //                 let (_key, value) = s.get_at_mut(field_idx).unwrap();
+    //                 apply_for_every_typed_field(value, applyer, max_recursion - 1);
+    //             }
+    //         }
+    //         bevy::reflect::ReflectMut::Enum(s) => {
+    //             for field_idx in 0..s.field_len() {
+    //                 apply_for_every_typed_field(
+    //                     s.field_at_mut(field_idx).unwrap(),
+    //                     applyer,
+    //                     max_recursion - 1,
+    //                 );
+    //             }
+    //         }
+    //         ReflectMut::Set(s) => {
+    //             // for field_idx in 0..s.len() {
+    //             //     apply_for_every_typed_field(
+    //             //         s.get_mut(field_idx).unwrap(),
+    //             //         applyer,
+    //             //         max_recursion - 1,
+    //             //     );
+    //             // }
+    //         }
+    //         ReflectMut::Opaque(o) => {
+    //             apply_for_every_typed_field(o, applyer, max_recursion - 1);
+    //         }
+    //         // ReflectMut::Function(_) => {}
+    //         _ => {}
+    //     }
+    // }
 }
 
 fn auto_remap_undo_redo<T: Component + Reflect>(

@@ -1,4 +1,6 @@
+use std::path::PathBuf;
 use bevy::{prelude::*, window::WindowResolution};
+use space_editor::prelude::GlobalResource;
 use space_editor::SpaceEditorPlugin;
 use space_editor_ui::{game_mode_changed, settings::GameModeSettings, simple_editor_setup};
 
@@ -10,6 +12,13 @@ fn main() {
     };
 
     let mut app = App::new();
+    app.insert_resource(GlobalResource {
+        project_path: PathBuf::from(""),
+        vs_path: PathBuf::from(""),
+        editor_assets_path: PathBuf::from(""),
+        tcp_port: 8888,
+        access_token: "".to_string(),
+    });
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(Window {
             resizable: true,

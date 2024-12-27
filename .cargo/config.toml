@@ -1,0 +1,7 @@
+[build]
+rustc-wrapper = "sccache"
+incremental = true  # sccache doesn't support it but it gives us shorter compile time for our own crates, therefore only dependencies are cached (still >90% of crates)
+
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld.exe"
+rustflags = ["-Zshare-generics=y", "-Z", "threads=8"]
