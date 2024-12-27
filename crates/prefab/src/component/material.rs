@@ -123,6 +123,7 @@ impl ColorMaterialPrefab {
         ColorMaterial {
             color: self.color,
             texture,
+            ..default()
         }
     }
 }

@@ -69,7 +69,7 @@ fn clear_after_save(mut commands: Commands, queue: Query<Entity, With<CollapsedS
     }
 }
 
-pub fn prepare_auto_scene(app: &mut App, world: &mut World) {
+pub fn prepare_auto_scene(world: &mut World) {
     unsafe {
         let cell = world.as_unsafe_world_cell();
 
@@ -96,16 +96,16 @@ pub fn prepare_auto_scene(app: &mut App, world: &mut World) {
 
             let mut dyn_scene = DynamicSceneBuilder::from_world(cell.world())
                 .allow_all()
-                .with_filter(SceneFilter::Allowlist(HashSet::from_iter(
+                .with_component_filter(SceneFilter::Allowlist(HashSet::from_iter(
                     allow_types.iter().cloned(),
                 )));
 
             dyn_scene = recursive_extract(&cell, dyn_scene, *root_entity);
 
-            let scene = dyn_scene.build(app);
-            //let Some(app_registry) = cell.world().get_resource::<AppTypeRegistry>() else {
+            let scene = dyn_scene.build();
+            // let Some(app_registry) = cell.world().get_resource::<AppTypeRegistry>() else {
             //    continue;
-            //};
+            // };
 
             let type_registry_arc: &TypeRegistryArc = &**cell.world().resource::<AppTypeRegistry>();
             let type_registry = type_registry_arc.read();
@@ -196,7 +196,7 @@ fn apply_compressed_scenes(
     asset_server: Res<AssetServer>,
 ) {
     for (root_entity, mut scene, base_scene, children) in roots.iter_mut() {
-        if asset_server.load_state(base_scene) != bevy::asset::LoadState::Loaded {
+        if !asset_server.load_state(base_scene).is_loaded() {
             continue;
         }
 

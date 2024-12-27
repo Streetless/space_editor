@@ -326,12 +326,12 @@ fn sync_asset_mesh(
     assets: Res<AssetServer>,
 ) {
     for (e, mesh) in changed.iter() {
-        commands.entity(e).insert(assets.load::<Mesh>(&mesh.path));
+        commands.entity(e).insert(Mesh3d(assets.load::<Mesh>(&mesh.path)));
     }
 
     for e in deleted.read() {
         if let Some(mut cmd) = commands.get_entity(e) {
-            cmd.remove::<Handle<Mesh>>();
+            cmd.remove::<Mesh3d>();
             info!("Removed mesh handle for {:?}", e);
         }
     }

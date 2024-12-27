@@ -19,8 +19,6 @@ pub fn spawn_scene(
             Entity,
             &GltfPrefab,
             Option<&Children>,
-            Option<&Visibility>,
-            Option<&Transform>,
             Option<&SceneAutoChild>,
         ),
         Changed<GltfPrefab>,
@@ -28,7 +26,7 @@ pub fn spawn_scene(
     auto_children: Query<&SceneAutoChild>,
     asset_server: Res<AssetServer>,
 ) {
-    for (e, prefab, children, visibility, transform, auto_child) in prefabs.iter() {
+    for (e, prefab, children, auto_child) in prefabs.iter() {
         if let Some(children) = children {
             for e in children {
                 if auto_children.contains(*e) {
@@ -212,14 +210,14 @@ pub fn sync_spritesheet(
             if let Some(clip) = clips.clips.get(&clip_name.name) {
                 commands
                     .entity(e)
-                    .insert(SpriteBundle {
-                        texture: texture_atlas.clone().texture.unwrap_or_default(),
-                        transform: Transform::from_scale(Vec3::splat(6.0)),
+                    .insert(Sprite {
+                        image: texture_atlas.clone().texture.unwrap_or_default(),
+                        texture_atlas: Some(TextureAtlas {
+                            layout: atlas,
+                            index: clip.first,
+                        }),
+                        custom_size: Some(Vec2::splat(6.0)),
                         ..default()
-                    })
-                    .insert(TextureAtlas {
-                        layout: atlas,
-                        index: clip.first,
                     });
             };
         }
